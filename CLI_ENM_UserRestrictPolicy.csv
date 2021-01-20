@@ -1,0 +1,10 @@
+default;Restrict for USERNAME user group! ;cmedit delete .*\*
+default;Restrict for USERNAME user group! ;cmedit delete \*
+default;Restrict for USERNAME user group! ;cmedit action .*\*
+default;Restrict for USERNAME user group! ;cmedit action \*
+default;Restrict for USERNAME user group! ;cmedit set \*
+default;Restrict for USERNAME user group! ;cmedit set .*\*
+test;Restrict for USERNAME all BECAUSE WE CAN DO IT! ;alias
+test;Restrict for USERNAME hahahaha!!!! ;getip \*
+test;Restrict for USERNAME user group! ;cmedit get .*\*
+baddas;You are baddas, USERNAME! ;*
