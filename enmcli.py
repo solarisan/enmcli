@@ -68,7 +68,7 @@ Extended help command:'''
 
     def open_int_enm_session(self):
         try:
-            self.session = enmscripting.private.session._open_internal_session()
+            self.session = enmscripting.open()
         except Exception as e:
             print(e)
 
