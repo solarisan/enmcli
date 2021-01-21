@@ -55,7 +55,6 @@ Extended help command:'''
     completerArray = []
 
     def __init__(self, cli_dir):
-        super(EnmCli, self).__init__()
         self.cli_history_file_name = os.path.expanduser(self.cli_history_file_name)
         self.UserFileName = cli_dir + self.UserFileName
         self.PolicyFileName = cli_dir + self.PolicyFileName

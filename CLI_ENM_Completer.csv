@@ -1,0 +1,155 @@
+@ This is TAB completition file for cli.py
+@ Format:	"command@help caption" for ordinary comand. Last symbol in command must be NOT space. 
+@			"@commentary" for commented text in file
+@ If command consist from two different part splitted by space, completition will not work for first part. 
+@ Use two-steps description for this command (example: "batch@","batch execute@","batch execute file@")
+@=================================================================
+help@simple help message (also "h").
+manual@manual for command. "manual" will print list of avariable manual page
+quit@if you want to rest (also "q")
+@getip@get ip address - alias printed OAMIP and sync_status of nodes scope. Example: "getip HK0011*" 
+@getcell@get various cell state. Example: "getcell ERBS001*"
+l@execute bash cmd from cli, example "l cat set.xml" or "l ls"
+l+@start logging, use as  "l+" or "l+ logfile.txt"
+l-@stop logging
+alarm@The alarm command set is used to manage alarms.
+ap@The ap command set can be used to automatically integrate a node into the network.
+cmedit@The cmedit command set can be used to read, manipulate, and export Configuration Management data.
+alias@used for creating aliases, example: "alias "ls" "cmedit get * NetworkElement" "
+collection@The collection command set can be used to read Collection data.
+savedsearch@The savedsearch command set can be used to read Saved Search data.
+config@The config command set allows a user to access the ENM Configuration Handling feature (Live/No-Live configurations).
+cmaudit@The CM Audit Application can be used to identify inconsistencies, for a specific network element, in the network.
+credm@The credm command set manages security configuration and administration for the ENM services.
+fmedit@The fmedit command set can be used to perform Fault Management operations on Routes and CpiDetails.
+fmsnmp@The fmsnmp command set can be used to handle the configuration of the snmp agent.
+lcmadm@The lcmadm command set can add, edit and remove the ENM licenses, and manage the ENM license usage information.
+nodecmd@The nodecmd command set enables you to execute bulk commands on multiple nodes and log the response of each command in a file in ENM.
+netlog@The netlog command set is used to retrieve Network Element logs.
+nhc@The Node Health Check (nhc) command set.
+pkiadm@The pkiadm command set can be used to perform CRUD operations on profiles, entities and certificates.
+secadm@The secadm command set manages security configuration and administration on network nodes.
+shm@The shm command set performs various supported shm use cases from CLI.
+@ulsa@The ulsa command set is used to start/stop uplink spectrum sampling on nodes.
+@batch@execute file with CLI commands. Example: "batch execute file:set.txt" (NOT WORK)
+@batch execute@execute file with CLI commands. Example: "batch execute file:set.txt" (NOT WORK)
+@batch execute file:@execute file with CLI commands. Example: "batch execute file:set.txt" (NOT WORK)
+execute@execute file with CLI commands. Example: "execute file:set.txt"
+execute file:@execute file with CLI commands. Example: "execute file:set.txt"
+alarm ack@example: alarm ack scope [quick_filter] [filter]
+alarm clear@example: alarm clear scope [quick_filter] [filter]
+alarm comment@example: alarm comment "<comment_value>" scope [quick_filter] [filter] or alarm comment scope [quick_filter] [filter]
+alarm disable@example: alarm disable scope [quick_filter] [attributes]
+alarm enable@example: alarm enable scope [quick_filter] [attributes]
+alarm get@get alarms. Example - "alarm get ERBS001 -cri -maj -min"
+alarm hist@get history alarms "alarm hist ERBS001" or "alarm hist ERBS001* --critical --begin 2016-06-20 --end 2016-06-21"
+alarm status@get alarm supervision status for the nodes in the network "alarm status HK*"
+alarm sync@synchronize all the alarms for the network nodes "alarm sync scope [quick_filter]"
+alarm unack@alarm unack scope [quick_filter] [filter]
+ap bind@example: "ap bind -n ERBS001 -h TXXXXXX" - bind node to hardware serial number
+ap cancel@example: "ap cancel -n ERBS001" - cancel the integration for a node
+ap delete@example: "ap delete -n ERBS001" - delete a node from AP and ENM
+ap download@example: "ap download -o -n ERBS001" - download instalation files from node
+ap order@example: "ap order file:Project_ERBS001.zip" - create progect from file
+ap replace@example: "ap replace -n ERBS001 -s TYYYYYYYY" - replace hardware serial number 
+ap resume@example: "ap resume -n ERBS001" - resume integration
+ap status@example: "ap status -n ERBS001" - check project status
+ap upload@example: "ap upload -n ERBS001 file:CreateBBRNBulkCM_ERBS001.xml" - upload single file to proj
+ap view@example: "ap view -n ERBS001" - view project
+cmedit action@example: "cmedit action ERBS001;ERBS002;ERBS003 IpAccessHostEt=1 ping.(host=1.1.1.1)"
+cmedit get@example: "cmedit get * ManagedElement.*" or "cmedit get ERBS* EUtranCellFDD.cellRange>12"
+cmedit set@example: "cmedit set ERBS001 ENodeBFunction dnsLookupOnTai:OFF"
+cmedit create@example: "cmedit create MeContext=ERBS001,ManagedElement=1,ENodeBFunction=1,GeraNetwork=1 GeraNetworkId=1"
+cmedit delete@example: "cmedit delete MeContext=ERBS001,ManagedElement=1,ENodeBFunction=1"
+cmedit describe@read the description of modeled data in the system "cmedit describe *cell*" or "cmedit describe CmFunction.syncStatus"
+cmedit import@example: "cmedit import -f file:3gppImportFile.xml -ft 3GPP", "cmedit import -st -j 13 -v"
+cmedit export@example: "cmedit export -n ERBS001 --filetype 3GPP", "cmedit export -st -j 3", "cmedit export --download -j 3"
+collection get@example: collection get <collection_name>
+collection list@example: collection list [CollectionName] [options]
+collection create@example: collection create <collection_name> [-f file:<file_name.txt>] [-pu | --public]
+collection modify@example: collection modify <collection_name> -f file:<file_name.txt> [-r | --replace]
+collection delete@example: collection delete <collection_name>
+savedsearch list@"savedsearch list" is used to display details of all Saved Searches visible to the current user.
+config list@get a list of all configurations "config list [-v | --verbose]"
+config create@create a non live configuration "config create <newConfigurationName>"
+config copy@names into an empty configuration "config copy --ne ERBS001;ERBS002 --source config1 --target config2" and "config copy --status"
+config diff@Compare non-live configurations "config diff --target config1 --source config2"
+config activate@activate config "config activate --source config1" or "config activate --source config1 --ne RBS1" and "config activate --status"
+config undo@Create and download an cmedit undo import file for job 80 "config undo --activationjob 80","config undo --status --job 81", "config undo --download --job 81"
+config history@view changes history "config history --source Live" or "config history --source config1 -b 2019-07-29 -e 2019-07-30 -verbose "
+config delete@delete a non-live configuration and check the status of this deletion "config delete config_2" and "config delete --status"
+fmedit create@example: fmedit create name=AlarmNewTest description="FM TAF Testing",outputType=Auto_Ack
+fmedit delete@example: fmedit delete * AlarmRoutePolicy.(outputType==Auto_Ack)
+fmedit get@example: fmedit get * AlarmRoutePolicy.(name==NewFmPolicy) AlarmRoutePolicy.*
+fmedit set@example: fmedit set * AlarmRoutePolicy.(fdn=="NetworkElement=LTE06ERBS00001") enablePolicy="true"
+fmsnmp create@example: fmsnmp create v2c attributes [parameters]
+fmsnmp delete@example: fmsnmp delete name
+fmsnmp get@example: fmsnmp get nmslist
+fmsnmp set@example: fmsnmp set argument [name] [parameters]
+lcmadm activate@example: lcmadm activate --emergency-unlock
+lcmadm export@example: lcmadm export --current-usage
+lcmadm install@example: lcmadm install file: <LICENSE_FILE>
+lcmadm get@example: lcmadm get --emergency-unlock-info
+lcmadm list@example: lcmadm list
+lcmadm remove@lexample: cmadm remove name=<LICENSE_NAME>
+lcmadm set@example: lcmadm set name=<LICENSE_NAME> --capacity-threshold=<PERCENTAGE>
+cmaudit execute@example: cmaudit execute -n | --node <node_name> 
+cmaudit status@example: cmaudit status --jobid | -j <job_id>
+nodecmd upload@example: nodecmd upload ( --cf | --cmdfile ) file: [ <CommandScriptFile.txt> | <ConfigFile.cfg>  ]
+nodecmd execute@nodecmd execute --ne <node_name> ( --cf | --cmdfile ) [ <CommandScriptFile.txt> | <ConfigFile.cfg>  ]
+nodecmd download@nodecmd download ( --cf | --cmdfile ) [ <CommandScriptFile.txt> | <ConfigFile.cfg>  ]
+nodecmd status@nodecmd status ( --j | --jobid ) ( "<jobid>" | <jobid> )
+nodecmd list@nodecmd list ( --cf | --cmdfile )
+nodecmd delete@nodecmd delete ( --cf | --cmdfile ) [ <CommandScriptFile.txt> | <ConfigFile.cfg>  ]
+nodecmd cancel@nodecmd cancel ( --j | --jobid ) ( "<jobId>" | <jobId> )
+netlog describe@Get the supported log type for NE "netlog describe ERBS001"
+netlog upload@Upload log(s) from network element to ENM "netlog upload ERBS001 CORBA_AUDITTRAIL_LOG;SHELL_AUDITTRAIL_LOG"
+netlog status@Check the status of log(s) upload operation "netlog status ERBS001 SHELL_AUDITTRAIL_LOG"
+netlog download@Download log(s) to user device "netlog download ERBS001 SHELL_AUDITTRAIL_LOG"
+netlog delete@delete the collected log files for a network element from the ENM file system
+nhc ac@example: "nhc ac (-u | --upload) file:<acceptance-criteria-name>" or "nhc ac (-l | --list)"
+nhc rep@example: "nhc rep -st" or "nhc rep run -jn <JOB_NAME> -n <NODE_NAME> -c <CHECK_NAME>"
+nhc compare@"nhc rep -st" or "nhc compare run <criteria> filter <job_identification> <job_identification>"
+pkiadm ctm@example: "pkiadm ctm EECert --list --entityname TY0038-BL --status active"
+pkiadm cfg
+pkiadm etm
+pkiadm extcaexport
+pkiadm extcaimport
+pkiadm extcalist
+pkiadm extcaremove
+pkiadm extcaremovecrl
+pkiadm extcaupdate
+pkiadm profilemgmt
+pkiadm revmgmt
+pkiadm crlmgmt
+pkiadm trustmgmt
+pkiadm entitymgmt@pkiadm entitymgmt --createbulk --xmlfile file:entity_ipsec_template.xml
+secadm capability
+secadm certificate
+secadm credentials
+secadm crl
+secadm disable
+secadm enable
+secadm get
+secadm https
+secadm job
+secadm ldap
+secadm read
+secadm rtsel
+secadm securitylevel
+secadm set
+secadm snmp
+secadm sshkey
+secadm trust@secadm trust remove --trustcategory
+secadm ftp
+secadm iPSec
+secadm laad
+shm export@Export SW/HW/license NE data "shm export -n ERBS001 -sw -lic -hw"
+shm import@import license/sw to SHM "shm import -l file:erbs1.zip" or "shm import -s file:CXP1020511.zip" 
+shm status@get jobs status "shm status -all" or "shm status -jo VASYA -js COMPLETED"
+shm listdomaintype@list of supported Domain and Type, values for ECIM-based nodes "shm listdomaintype <NeName>"
+shm backup@create backup or peripdic backup "shm backup -n ERBS001 -bn BUname"
+shm restart@restart node "shm restart -n ERBS001 -rn PLANNED_RECONFIGURATION"
+shm deleteup@delete UP from nodes "shm deleteup -n <NeName> -pn <productNumber> -pr <productRevision>"
+shm installlkf@install license key file on the node with the latest sequence number "shm installlkf -n ERBS001"
+shm listups@display Upgrade Packages (UPs) on the nodes "shm listups -ne <NeType> -pn <productNumber> -pr <productRevision>"
