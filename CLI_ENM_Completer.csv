@@ -15,7 +15,7 @@ l-@stop logging
 alarm@The alarm command set is used to manage alarms.
 ap@The ap command set can be used to automatically integrate a node into the network.
 cmedit@The cmedit command set can be used to read, manipulate, and export Configuration Management data.
-alias@used for creating aliases, example: "alias "ls" "cmedit get * NetworkElement" "
+alias@creating aliases, example: "alias 'ls' 'cmedit get * NetworkElement'" ("cmedit get * CliAlias.*" show all aliases)
 collection@The collection command set can be used to read Collection data.
 savedsearch@The savedsearch command set can be used to read Saved Search data.
 config@The config command set allows a user to access the ENM Configuration Handling feature (Live/No-Live configurations).
