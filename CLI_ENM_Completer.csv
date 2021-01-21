@@ -30,7 +30,7 @@ nhc@The Node Health Check (nhc) command set.
 pkiadm@The pkiadm command set can be used to perform CRUD operations on profiles, entities and certificates.
 secadm@The secadm command set manages security configuration and administration on network nodes.
 shm@The shm command set performs various supported shm use cases from CLI.
-@ulsa@The ulsa command set is used to start/stop uplink spectrum sampling on nodes.
+ulsa@The ulsa command set is used to start/stop uplink spectrum sampling on nodes.
 @batch@execute file with CLI commands. Example: "batch execute file:set.txt" (NOT WORK)
 @batch execute@execute file with CLI commands. Example: "batch execute file:set.txt" (NOT WORK)
 @batch execute file:@execute file with CLI commands. Example: "batch execute file:set.txt" (NOT WORK)
@@ -110,9 +110,9 @@ netlog delete@delete the collected log files for a network element from the ENM 
 nhc ac@example: "nhc ac (-u | --upload) file:<acceptance-criteria-name>" or "nhc ac (-l | --list)"
 nhc rep@example: "nhc rep -st" or "nhc rep run -jn <JOB_NAME> -n <NODE_NAME> -c <CHECK_NAME>"
 nhc compare@"nhc rep -st" or "nhc compare run <criteria> filter <job_identification> <job_identification>"
-pkiadm ctm@example: "pkiadm ctm EECert --list --entityname TY0038-BL --status active"
-pkiadm cfg
-pkiadm etm
+pkiadm certmgmt@pkiadm certmgmt EECert --list --entityname ERBS1 --status active
+pkiadm configmgmt@pkiadm configmgmt category --list
+pkiadm entitymgmt@"pkiadm entitymgmt --list --entitytype ca" or "pkiadm entitymgmt --createbulk --xmlfile file:entity_ipsec_template.xml"
 pkiadm extcaexport
 pkiadm extcaimport
 pkiadm extcalist
@@ -122,11 +122,13 @@ pkiadm extcaupdate
 pkiadm profilemgmt
 pkiadm revmgmt
 pkiadm crlmgmt
-pkiadm trustmgmt
-pkiadm entitymgmt@pkiadm entitymgmt --createbulk --xmlfile file:entity_ipsec_template.xml
-secadm capability
-secadm certificate
-secadm credentials
+pkiadm trustmgmt@pkiadm trustmgmt --list --entitytype ca
+secadm capability@"secadm capability get --all" or 
+secadm certificate@The secadm certificate commandset manages certificates on the network nodes.
+secadm certificate get@secadm certificate get CERT_TYPE TARGET_NODES
+secadm certificate issue@secadm certificate issue -ct OAM -xf file:abc.xml
+secadm certificate reissue@secadm certificate reissue -ct OAM -ca "NE_IPsec_CA" -sn 1b516d5760b0dee1 -r CACompromise
+secadm credentials@
 secadm crl
 secadm disable
 secadm enable
@@ -139,9 +141,15 @@ secadm rtsel
 secadm securitylevel
 secadm set
 secadm snmp
-secadm sshkey
-secadm trust@secadm trust remove --trustcategory
-secadm ftp
+secadm sshkey@The secadm sshkey commandset generates and updates the ENM public and private SSH keys (key pair).
+secadm sshkey create@secadm sshkey create -t DSA_1024 -n SGSN_MME_01
+secadm sshkey update@secadm sshkey update -t DSA_1024 -n SGSN_MME_01
+secadm sshkey import@secadm sshkey import --sshprivatekeyfile file:<FILE_NAME> --nodename <NODE_NAME>
+secadm trust@ get/distribute/remove trustcategory cert
+secadm trust get@secadm trust get --trustcategory OAM --nodelist ERBS01
+secadm trust distribute@secadm trust distribute --trustcategory IPSEC --nodefile file:NodeFile.txt
+secadm trust remove@secadm trust remove --trustcategory IPSEC -ca "ENM_CA" --serialnumber "123" --nodelist all
+secadm ftp@secadm ftp get --netype SBG-IS
 secadm iPSec
 secadm laad
 shm export@Export SW/HW/license NE data "shm export -n ERBS001 -sw -lic -hw"
@@ -153,3 +161,6 @@ shm restart@restart node "shm restart -n ERBS001 -rn PLANNED_RECONFIGURATION"
 shm deleteup@delete UP from nodes "shm deleteup -n <NeName> -pn <productNumber> -pr <productRevision>"
 shm installlkf@install license key file on the node with the latest sequence number "shm installlkf -n ERBS001"
 shm listups@display Upgrade Packages (UPs) on the nodes "shm listups -ne <NeType> -pn <productNumber> -pr <productRevision>"
+ulsa start@example: ulsa start snapshot ERBS1 ulsa1 ManagedElement=1,Equipment=1,AuxPlugInUnit=radiounit1,DeviceGroup=1,RfPort=A -cf 1960000 -db 2325 -rb 10
+ulsa capability@example: ulsa capability ERBS1 ulsa1 ManagedElement=1,Equipment=1,AuxPlugInUnit=radiounit1
+ulsa stop@example: ulsa stop sampling ERBS1 ulsa1 ManagedElement=1,Equipment=1,AuxPlugInUnit=1,DeviceGroup=1,RfPort=A
