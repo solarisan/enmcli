@@ -45,6 +45,7 @@ Extended help command:'''
     cli_history_file_name = '~/.cliHistory'
     UserFileName = '/CLI_ENM_UserGroup.csv'
     PolicyFileName = '/CLI_ENM_UserRestrictPolicy.csv'
+    UnprotectedMode = False
     extend_manual_file_name = '/CLI_ENM_help.csv'
     unsafe_log_dir = '/cli_log/'
     safe_log_dir = '/cli_safelog/'
@@ -303,27 +304,28 @@ Extended help command:'''
     def _check_cmd_permission(self, cmd_string, username):
         return_value = 'permit'
         user_group = 'default'
-        try:
-            if os.path.exists(self.UserFileName):
-                with open(self.UserFileName, 'r') as user_file:
-                    for line in user_file:
-                        if line.split(';')[0] == username:
-                            user_group = line.split(';')[1].replace('\n', '').replace('\r', '')
-            else:
-                return_value = 'cant find UserFile'
-            if os.path.exists(self.PolicyFileName):
-                with open(self.PolicyFileName, 'r') as policy_file:
-                    for line in policy_file:
-                        if line.split(';')[0] == user_group:
-                            if re.search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
-                                         re.IGNORECASE) is not None:
-                                return_value = line.split(';')[1].replace('USERNAME', username)
-            else:
-                return_value = 'cant find PolicyFile'
-        except Exception as e:
-            print(e)
-            return_value = \
-                'cli.py script error during check permission!'
+        if not self.UnprotectedMode:
+            try:
+                if os.path.exists(self.UserFileName):
+                    with open(self.UserFileName, 'r') as user_file:
+                        for line in user_file:
+                            if line.split(';')[0] == username:
+                                user_group = line.split(';')[1].replace('\n', '').replace('\r', '')
+                else:
+                    return_value = 'cant find UserFile'
+                if os.path.exists(self.PolicyFileName):
+                    with open(self.PolicyFileName, 'r') as policy_file:
+                        for line in policy_file:
+                            if line.split(';')[0] == user_group:
+                                if re.search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
+                                             re.IGNORECASE) is not None:
+                                    return_value = line.split(';')[1].replace('USERNAME', username)
+                else:
+                    return_value = 'cant find PolicyFile'
+            except Exception as e:
+                print(e)
+                return_value = \
+                    'cli.py script error during check permission!'
         return return_value
 
     # support method, send command to logs
@@ -341,7 +343,7 @@ Extended help command:'''
             return True
         except Exception as e:
             print(e)
-            print("Cant write log!!!")
+            print("Cant write log to " + self.unsafe_log_dir)
         return False
 
     # This method using to read command file and send command to enm terminal.
@@ -387,7 +389,13 @@ Extended help command:'''
                         if help.split('@@@@')[0].find(question) > -1:
                             print(" " * len(self.cliInputString) + help.split('@@@@')[0])
 
-    # This special method! Execution may be croned with root permissions to copy unprotected log to protected log dir!
+    # This special static method!
+    # Move logfiles data from unsafe dir to safe dir!
+    # Do not overwrite data in safe dir!
+    # Remove old file in unsafe dir!
+    # Execution may be croned with root or equal permissions to copy unprotected log to protected log dir!
+    # for example:
+    # */1 * * * * /usr/bin/python /home/shared/protected_user/cli_safe_log.py
     @staticmethod
     def cli_log_copy_to_safe(unsafe_log_dir, safe_log_dir, obsolescence_days):
         try:
