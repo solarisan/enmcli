@@ -41,6 +41,8 @@ For question about cli.py contact or innightwolfsleep@yandex.ru
 Extended help command:'''
     enm_session = None
     cliInputString = 'CLI> '
+    conveyor_to_cli_prefix = 'cli>'
+    conveyor_delimeter = '|'
     maxAutoCliCmdInBashSequence = 30
     cli_history_file_name = '~/.cliHistory'
     UserFileName = '/CLI_ENM_UserGroup.csv'
@@ -70,21 +72,20 @@ Extended help command:'''
             return self.enm_session
         except Exception as e:
             print(e)
+            return None
 
     # open external ENM session
     def open_ext_enm_session(self, enm_address='', login='', password=''):
         try:
             session = enmscripting.private.session.ExternalSession(enm_address)
-            print session
             enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(session)
-            print enm_session
             enm_session = enm_session.with_credentials(
                 enmscripting.security.authenticator.UsernameAndPassword(login, password))
-            print enm_session
             self.enm_session = enm_session
             return enm_session
         except Exception as e:
             print(e)
+            return None
 
     # This method for beginning to starts CLI shell - parse input args and go to initialize_shell
     def start(self, sys_args):
@@ -108,21 +109,21 @@ Extended help command:'''
     # This method starts enm session if it is not exist
     def initialize_enm_session(self, enm_url='', enm_login='', enm_password=''):
         # prepare sessions and cli options
-        if self.enm_session is None or isinstance(self.enm_session, enmscripting.enmsession.UnauthenticatedEnmSession):
-            if enm_url == '':
-                self.open_int_enm_session()
-        if self.enm_session is None or isinstance(self.enm_session, enmscripting.enmsession.UnauthenticatedEnmSession):
+        new_enm_session = None
+        if enm_url == '':
+            new_enm_session = self.open_int_enm_session()
+        if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             if enm_url == '':
                 enm_url = raw_input('ENM URL: ')
             if enm_login == '':
                 enm_login = raw_input('ENM login: ')
             if enm_password == '':
                 enm_password = getpass.getpass('ENM password: ')
-            self.open_ext_enm_session(enm_url, enm_login, enm_password)
-        if self.enm_session is None or isinstance(self.enm_session, enmscripting.enmsession.UnauthenticatedEnmSession):
+            new_enm_session = self.open_ext_enm_session(enm_url, enm_login, enm_password)
+        if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             print('Cant open any ENM session!')
             exit()
-        return self.enm_session
+        return new_enm_session
 
     # This prepare CLI shell start - start enm session and set readline options, then go to infinite_cli_loop
     def initialize_shell(self, first_cmd=''):
@@ -176,14 +177,14 @@ Extended help command:'''
                 else:
                     print('logfile already closed')
             elif len(cmd_string) > 0:
-                response_text = self.terminal_cmd_execute(terminal, cmd_string.split(' | ')[0])
-                if len(cmd_string.split(' | ')) > 1 and len(response_text) > 0:
-                    conveyor_cmd_list = cmd_string.split(' | ')[1:]
+                response_text = self.terminal_cmd_execute(terminal, cmd_string.split(self.conveyor_delimeter)[0])
+                if len(cmd_string.split(self.conveyor_delimeter)) > 1 and len(response_text) > 0:
+                    conveyor_cmd_list = cmd_string.split(self.conveyor_delimeter)[1:]
                     for conveyor_cmd in conveyor_cmd_list:
-                        if conveyor_cmd.find('cli>') > -1:
+                        if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_prefix):
                             next_cmd_list = response_text.split('\n')
                             response_text = ''
-                            cmd_length_ok = ''
+                            cmd_length_ok = 'y'
                             if len(next_cmd_list) > self.maxAutoCliCmdInBashSequence:
                                 cmd_length_ok = \
                                     raw_input('It is ' + str(len(next_cmd_list)) +
@@ -191,14 +192,13 @@ Extended help command:'''
                             if cmd_length_ok == 'y' or cmd_length_ok == 'Y':
                                 for next_cmd in next_cmd_list:
                                     next_cmd = next_cmd.replace('\r', '').replace('\n', '')
-                                    next_response = self.terminal_cmd_execute(terminal, next_cmd)
-                                    response_text = response_text + '\n' + next_response
+                                    response_text = response_text + "\n" + self.terminal_cmd_execute(terminal, next_cmd)
                             else:
                                 response_text = 'Aborted by user! Too much cli command in sequence! It is ' \
                                                     + str(len(next_cmd_list)) + 'cmd!'
                         else:
                             response_text = self.subprocess_cmd(conveyor_cmd, response_text)
-                self._chars_restricted_print(response_text)
+                print(self._utf8_chars_to_space(response_text))
                 if file_out_name is not None:
                     try:
                         with open(file_out_name, 'a') as file_out:
@@ -416,16 +416,16 @@ Extended help command:'''
             print(e)
             return False
 
-    # replace response utf chars to space
+    # encode utf to ASCII, replace undefined to " "
     @staticmethod
-    def _chars_restricted_print(string):
+    def _utf8_chars_to_space(string):
         ss = ""
         for i in string:
             if ord(i) < 127:
                 ss = ss + i
             else:
                 ss = ss + " "
-        print(ss)
+        return ss
 
     # execute cli terminal command and return response
     @staticmethod
