@@ -99,7 +99,7 @@ Extended help command:'''
                 self.execute_cmd_file(cmd_file_name, out_file_name)
             else:
                 self.initialize_enm_session()
-                self.infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
+                self._infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
         else:
             print(self.invite_help)
             self.initialize_enm_session()
@@ -124,7 +124,7 @@ Extended help command:'''
             exit()
         return new_enm_session
 
-    # This prepare CLI shell start - start enm session and set readline options, then go to infinite_cli_loop
+    # This prepare CLI shell start - start enm session and set readline options, then go to _infinite_cli_loop
     def initialize_shell(self, first_cmd=''):
         # prepare sessions and cli options
         readline.parse_and_bind('tab: complete')
@@ -136,15 +136,18 @@ Extended help command:'''
             cli_history_file.close()
         readline.read_history_file(self.cli_history_file_name)
         readline.set_history_length(1000)
-        self.infinite_cli_loop(first_cmd)
+        self._infinite_cli_loop(first_cmd)
 
     # This is main method. This starts infinite raw_input loop, contain commands parser.
-    # refer to terminal_cmd_execute running cli commands
-    def infinite_cli_loop(self, first_cmd='', run_single_cmd=False):
+    # refer to _terminal_cmd_execute running cli commands
+    def _infinite_cli_loop(self, first_cmd='', run_single_cmd=False):
         terminal = self.enm_session.terminal()
         file_out_name = None
         cmd_string = first_cmd
+        # this is a loop if cmd_string not "quit"
         while cmd_string not in ['q', 'q ', 'quit', 'quit ']:
+            response_text = ''
+            # parse and execute cmd_string
             if cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
             elif cmd_string.startswith('manual') or cmd_string.startswith('help'):
@@ -161,62 +164,69 @@ Extended help command:'''
                 print(response_text)
             elif cmd_string.startswith('l+'):
                 if file_out_name is None:
-                    if len(cmd_string.split(' ')) > 1 and len(cmd_string.split(' ')[1]):
-                        file_out_name = cmd_string.split(' ')[1]
-                    else:
-                        file_out_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
-
-                    print('logfile: ' + file_out_name)
+                    file_out_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
+                    if len(cmd_string.split(' ')) > 1:
+                        if len(cmd_string.split(' ')[1]) > 0:
+                            file_out_name = cmd_string.split(' ')[1]
+                    print('set logfile: ' + file_out_name)
                 else:
-                    print('logfile already open: ' + file_out_name)
-            elif cmd_string in ['l-', 'l- ']:
+                    print('logfile already set: ' + file_out_name)
+            elif cmd_string.startswith('l-'):
                 if file_out_name is not None:
-                    print('logfile closed: ' + file_out_name)
+                    print('logfile unset: ' + file_out_name)
                     file_out_name = None
                 else:
-                    print('logfile already closed')
+                    print('logfile already unset')
             elif len(cmd_string) > 0:
-                response_text = self.terminal_cmd_execute(terminal, cmd_string.split(self.conveyor_delimeter)[0])
-                if len(cmd_string.split(self.conveyor_delimeter)) > 1 and len(response_text) > 0:
-                    conveyor_cmd_list = cmd_string.split(self.conveyor_delimeter)[1:]
-                    for conveyor_cmd in conveyor_cmd_list:
-                        if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_prefix):
-                            next_cmd_list = response_text.split('\n')
-                            response_text = ''
-                            cmd_length_ok = 'y'
-                            if len(next_cmd_list) > self.maxAutoCliCmdInBashSequence:
-                                cmd_length_ok = \
-                                    raw_input('It is ' + str(len(next_cmd_list)) +
-                                              ' cli commands in sequence. Too much! Are you sure? (y/n): ')
-                            if cmd_length_ok == 'y' or cmd_length_ok == 'Y':
-                                for next_cmd in next_cmd_list:
-                                    next_cmd = next_cmd.replace('\r', '').replace('\n', '')
-                                    response_text = response_text + "\n" + self.terminal_cmd_execute(terminal, next_cmd)
-                            else:
-                                response_text = 'Aborted by user! Too much cli command in sequence! It is ' \
-                                                    + str(len(next_cmd_list)) + 'cmd!'
-                        else:
-                            response_text = self.subprocess_cmd(conveyor_cmd, response_text)
+                response_text = self._conveyor_cmd_executor(terminal, cmd_string)
                 print(self._utf8_chars_to_space(response_text))
-                if file_out_name is not None:
-                    try:
-                        with open(file_out_name, 'a') as file_out:
-                            file_out.write('\n' + self.cliInputString + cmd_string + '\n' + response_text)
-                    except Exception as e:
-                        print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), e)
+            # try to write log&history files
+            try:
+                if file_out_name is not None and len(response_text) > 0:
+                    with open(file_out_name, 'a') as file_out:
+                        file_out.write('\n' + self.cliInputString + cmd_string + '\n' + response_text)
+            except Exception as e:
+                print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), e)
             try:
                 readline.write_history_file(self.cli_history_file_name)
             except Exception as e:
                 print("Cant write cli history to file: " + self.cli_history_file_name, e)
             if run_single_cmd:
                 break
+            # start input for next iteration
             cmd_string = raw_input(self.cliInputString)
         return enmscripting.close(self.enm_session)
+
+    def _conveyor_cmd_executor(self, terminal, cmd_string):
+        response_text = self._terminal_cmd_execute(terminal, cmd_string.split(self.conveyor_delimeter)[0])
+        # if there are conveyor delimeter in cmd_string and first command execution done, start conveyor
+        if len(cmd_string.split(self.conveyor_delimeter)) > 1 and len(response_text) > 0:
+            conveyor_cmd_list = cmd_string.split(self.conveyor_delimeter)[1:]
+            for conveyor_cmd in conveyor_cmd_list:
+                if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_prefix):
+                    next_cmd_list = response_text.split('\n')
+                    response_text = ''
+                    cmd_length_ok = 'y'
+                    if len(next_cmd_list) > self.maxAutoCliCmdInBashSequence:
+                        cmd_length_ok = \
+                            raw_input('It is ' + str(len(next_cmd_list)) +
+                                      ' cli commands in sequence. Too much! Are you sure? (y/n): ')
+                    if cmd_length_ok == 'y' or cmd_length_ok == 'Y':
+                        for next_cmd in next_cmd_list:
+                            next_cmd = next_cmd.replace('\r', '').replace('\n', '')
+                            response_text = \
+                                response_text + "\n" + self._terminal_cmd_execute(terminal, next_cmd)
+                    else:
+                        response_text = 'Aborted by user! Too much cli command in sequence! It is ' \
+                                        + str(len(next_cmd_list)) + 'cmd!'
+                else:
+                    response_text = self.subprocess_cmd(conveyor_cmd, response_text)
+        return response_text
 
     # This method check cli command, parse and refer to terminal_cmd for running command.
     # refer to _check_cmd_permission for check permissions
     # refer to _add_cmd_to_log for save files to log
-    def terminal_cmd_execute(self, terminal, cmd_string):
+    def _terminal_cmd_execute(self, terminal, cmd_string):
         response_text = ''
         response = None
         try:
@@ -329,24 +339,27 @@ Extended help command:'''
 
     # support method, send command to logs
     def _add_cmd_to_log(self, cmd_string, username, return_value):
+        if not os.path.exists(self.unsafe_log_dir):
+            os.mkdir(self.unsafe_log_dir)
         try:
-            log_filename = self.unsafe_log_dir + 'ssh_cli_' + time.strftime('%Y%m%d') + '.log'
-            with open(log_filename, 'a') as log_file:
-                log_file.write(
-                    '\n' + time.strftime('%Y%m%d_%H%M%S') + ';' + username + ';' + return_value + ';' + cmd_string)
-            try:
-                os.chmod(log_filename, 0666)
-            except Exception as e:
-                print(e)
+            if os.path.isdir(self.unsafe_log_dir):
+                log_filename = self.unsafe_log_dir + 'ssh_cli_' + time.strftime('%Y%m%d') + '.log'
+                with open(log_filename, 'a') as log_file:
+                    log_file.write(
+                        '\n' + time.strftime('%Y%m%d_%H%M%S') + ';' + username + ';' + return_value + ';' + cmd_string)
+                try:
+                    os.chmod(log_filename, 0666)
+                except Exception as e:
+                    print(e)
+                    return True
                 return True
-            return True
         except Exception as e:
             print(e)
             print("Cant write log to " + self.unsafe_log_dir)
         return False
 
     # This method using to read command file and send command to enm terminal.
-    # Commands need to pass terminal_cmd_execute permission check!
+    # Commands need to pass _terminal_cmd_execute permission check!
     def execute_cmd_file(self, cmd_file_name, out_file_name='', enm_url='', enm_login='', enm_password=''):
         # prepare sessions and cli options
         self.initialize_enm_session(enm_url=enm_url, enm_login=enm_login, enm_password=enm_password)
@@ -357,7 +370,7 @@ Extended help command:'''
         if len(out_file_name.replace(' ', '')) > 2:
             file_out = open(out_file_name.replace(' ', ''), 'a')
         for line in lines:
-            response_text = self.terminal_cmd_execute(terminal, line)
+            response_text = self._terminal_cmd_execute(terminal, line)
             print('\n' + self.cliInputString + line + '\n' + response_text)
             try:
                 if file_out is not None:
