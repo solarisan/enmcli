@@ -64,28 +64,6 @@ Extended help command:'''
         self.completerFileName = cli_dir + self.completerFileName
         self.completerArray = self._get_cli_completer_array()
 
-    # open internal ENM session
-    def open_int_enm_session(self):
-        try:
-            self.enm_session = enmscripting.open()
-            return self.enm_session
-        except Exception as e:
-            print(e)
-            return None
-
-    # open external ENM session
-    def open_ext_enm_session(self, enm_address='', login='', password=''):
-        try:
-            session = enmscripting.private.session.ExternalSession(enm_address)
-            enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(session)
-            enm_session = enm_session.with_credentials(
-                enmscripting.security.authenticator.UsernameAndPassword(login, password))
-            self.enm_session = enm_session
-            return enm_session
-        except Exception as e:
-            print(e)
-            return None
-
     # This method for beginning to starts CLI shell - parse input args and go to initialize_shell
     def start(self, sys_args):
         # main, refer to infinite cli loop or execute_cmd_file
@@ -98,14 +76,17 @@ Extended help command:'''
                     out_file_name = ''
                 self.execute_cmd_file(cmd_file_name, out_file_name)
             else:
-                self.initialize_enm_session()
+                if self.initialize_enm_session() is None:
+                    exit()
                 self._infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
         else:
             print(self.invite_help)
-            self.initialize_enm_session()
-            self.initialize_shell()
+            if self.initialize_enm_session() is None:
+                exit()
+            self._initialize_shell_config()
+            self._infinite_cli_loop()
 
-    # This method starts enm session if it is not exist
+    # This method starts and return enm session. Overwrite self.enm_session if exist
     def initialize_enm_session(self, enm_url='', enm_login='', enm_password=''):
         # prepare sessions and cli options
         new_enm_session = None
@@ -121,12 +102,12 @@ Extended help command:'''
             new_enm_session = self.open_ext_enm_session(enm_url, enm_login, enm_password)
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             print('Cant open any ENM session!')
-            exit()
+            return None
+        self.enm_session = new_enm_session
         return new_enm_session
 
-    # This prepare CLI shell start - start enm session and set readline options, then go to _infinite_cli_loop
-    def initialize_shell(self, first_cmd=''):
-        # prepare sessions and cli options
+    # This prepare CLI shell configuration - set readline methods and cli_history_file
+    def _initialize_shell_config(self):
         readline.parse_and_bind('tab: complete')
         readline.set_completer_delims('')
         readline.set_completer(self._cli_completer)
@@ -136,10 +117,9 @@ Extended help command:'''
             cli_history_file.close()
         readline.read_history_file(self.cli_history_file_name)
         readline.set_history_length(1000)
-        self._infinite_cli_loop(first_cmd)
 
     # This is main method. This starts infinite raw_input loop, contain commands parser.
-    # refer to _terminal_cmd_execute running cli commands
+    # refer to _conveyor_cmd_executor running cli commands
     def _infinite_cli_loop(self, first_cmd='', run_single_cmd=False):
         terminal = self.enm_session.terminal()
         file_out_name = None
@@ -197,6 +177,8 @@ Extended help command:'''
             cmd_string = raw_input(self.cliInputString)
         return enmscripting.close(self.enm_session)
 
+    # conveyor split cmd_string to cmd list, if it is needed,
+    # then run cmd one-by-one, and send previous response to next cmd
     def _conveyor_cmd_executor(self, terminal, cmd_string):
         response_text = self._terminal_cmd_execute(terminal, cmd_string.split(self.conveyor_delimeter)[0])
         # if there are conveyor delimeter in cmd_string and first command execution done, start conveyor
@@ -438,6 +420,29 @@ Extended help command:'''
             else:
                 ss = ss + " "
         return ss
+
+    # open and return internal ENM session
+    @staticmethod
+    def open_int_enm_session():
+        try:
+            enm_session = enmscripting.open()
+            return enm_session
+        except Exception as e:
+            print(e)
+            return None
+
+    # open and return external ENM session
+    @staticmethod
+    def open_ext_enm_session(enm_address='', login='', password=''):
+        try:
+            session = enmscripting.private.session.ExternalSession(enm_address)
+            enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(session)
+            enm_session = enm_session.with_credentials(
+                enmscripting.security.authenticator.UsernameAndPassword(login, password))
+            return enm_session
+        except Exception as e:
+            print(e)
+            return None
 
     # execute cli terminal command and return response
     @staticmethod
