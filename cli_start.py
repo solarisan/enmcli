@@ -3,6 +3,7 @@
 
 from enmcli import EnmCli
 import sys
+import os
 
-cli_files_folder = '/home/shared/unprotected_user/enm_cli'
+cli_files_folder = os.path.expanduser('~/enm_cli')
 EnmCli(cli_files_folder).start(sys.argv)
