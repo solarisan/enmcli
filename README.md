@@ -1,5 +1,9 @@
 # enm_cli
-Ericsson Network Management CLI for terminal
+Ericsson Network Management CLI for terminal (for example, when you use direct ssh connect to ENM).
+Simple way to start - copy enmcli/ to you own directory and run cli_start.py.
+
+
+____________________________________________________
 
 CLI_ENM_Completer.csv - This file contains command completer for cli terminal
 
