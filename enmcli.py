@@ -65,7 +65,8 @@ Extended help command:'''
         self.completerArray = self._get_cli_completer_array()
 
     # This method for beginning to starts CLI shell - parse input args and go to initialize_shell
-    def start(self, sys_args):
+    def start(self, sys_args=[], unprotected_mode=False):
+        self.UnprotectedMode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if len(sys_args) > 1:
             if sys_args[1] == '-c' and len(sys_args) > 2:
