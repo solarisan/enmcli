@@ -7,18 +7,19 @@ Simple way to start using - copy enmcli/ to you $HOME directory on ENM scripting
 
 
 ____________________________________________________
-CLI_ENM_* files - additional completers, manuals and user restrction rules.
 
-CLI_ENM_Completer.csv - This file contains command completer for cli terminal
+- cli_start.py - contain start shell code.
 
-CLI_ENM_help.csv - This file contains help manual pages for command
+- cli_save_log.py - aditional utility, will move user logs from unsafe log dirrectory to safe directory. May be croned for each minute.
 
-CLI_ENM_UserGroup.csv - This file contains usernames and their group. If username not in file, user group is "default" 
+- enmcli.py - contains main code
 
-CLI_ENM_UserRestrictPolicy.csv - This file contains groupname ; message-when-restrict-appears ; regular expression of restricted command. Also, message-when-restrict "permit" will permit command.
+CLI_ENM_* files - additional completers, manuals and user restrction rules:
 
-cli_save_log.py - aditional utility, will move user logs from unsafe log dirrectory to safe directory. May be croned for each minute.
+- CLI_ENM_Completer.csv - This file contains command completer for cli terminal
 
-cli_start.py - contain start shell code.
+- CLI_ENM_help.csv - This file contains help manual pages for command
 
-enmcli.py - contains main code
+- CLI_ENM_UserGroup.csv - This file contains usernames and their group. If username not in file, user group is "default" 
+
+- CLI_ENM_UserRestrictPolicy.csv - This file contains groupname ; message-when-restrict-appears ; regular expression of restricted command. Also, message-when-restrict "permit" will permit command.
