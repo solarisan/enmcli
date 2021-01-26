@@ -64,8 +64,8 @@ Extended help command:'''
         self.completerFileName = cli_dir + self.completerFileName
         self.completerArray = self._get_cli_completer_array()
 
-    # This method for beginning to starts CLI shell - parse input args and go to initialize_shell
     def start(self, sys_args, unprotected_mode=False):
+    '''This method for beginning to starts CLI shell - parse input args and go to initialize_shell'''
         self.UnprotectedMode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if len(sys_args) > 1:
