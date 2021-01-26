@@ -53,8 +53,13 @@ Extended help command:'''
     safe_log_dir = '/cli_safelog/'
     completerFileName = '/CLI_ENM_Completer.csv'
     completerArray = []
+    completer_space_count_before_text = 20
 
     def __init__(self, cli_dir):
+        """
+        init code, set folder with all suplimentary files (log dir, restriction files, help files...)
+        :param cli_dir:
+        """
         self.cli_history_file_name = os.path.expanduser(self.cli_history_file_name)
         self.UserFileName = cli_dir + self.UserFileName
         self.PolicyFileName = cli_dir + self.PolicyFileName
@@ -65,7 +70,12 @@ Extended help command:'''
         self.completerArray = self._get_cli_completer_array()
 
     def start(self, sys_args, unprotected_mode=False):
-    '''This method for beginning to starts CLI shell - parse input args and go to initialize_shell'''
+        """
+        This method for beginning to starts CLI shell - parse input args and go to initialize_shell
+        :param sys_args:
+        :param unprotected_mode:
+        :return:
+        """
         self.UnprotectedMode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if len(sys_args) > 1:
@@ -87,8 +97,14 @@ Extended help command:'''
             self._initialize_shell_config()
             self._infinite_cli_loop()
 
-    # This method starts and return enm session. Overwrite self.enm_session if exist
     def initialize_enm_session(self, enm_url='', enm_login='', enm_password=''):
+        """
+        This method starts and return enm session. Overwrite self.enm_session if exist
+        :param enm_url:
+        :param enm_login:
+        :param enm_password:
+        :return:
+        """
         # prepare sessions and cli options
         new_enm_session = None
         if enm_url == '':
@@ -107,8 +123,11 @@ Extended help command:'''
         self.enm_session = new_enm_session
         return new_enm_session
 
-    # This prepare CLI shell configuration - set readline methods and cli_history_file
     def _initialize_shell_config(self):
+        """
+        This prepare CLI shell configuration - set readline methods and cli_history_file
+        :return:
+        """
         readline.parse_and_bind('tab: complete')
         readline.set_completer_delims('')
         readline.set_completer(self._cli_completer)
@@ -119,9 +138,14 @@ Extended help command:'''
         readline.read_history_file(self.cli_history_file_name)
         readline.set_history_length(1000)
 
-    # This is main method. This starts infinite raw_input loop, contain commands parser.
-    # refer to _conveyor_cmd_executor running cli commands
     def _infinite_cli_loop(self, first_cmd='', run_single_cmd=False):
+        """
+        This is main shell method. This starts infinite raw_input loop, contain commands parser.
+        Refer to _conveyor_cmd_executor running cli commands.
+        :param first_cmd:
+        :param run_single_cmd:
+        :return: enm_session close status
+        """
         file_out_name = None
         cmd_string = first_cmd
         # this is a loop if cmd_string not "quit"
@@ -177,9 +201,13 @@ Extended help command:'''
             cmd_string = raw_input(self.cliInputString)
         return enmscripting.close(self.enm_session)
 
-    # conveyor split cmd_string to cmd list, if it is needed,
-    # then run cmd one-by-one, and send previous response to next cmd
     def _conveyor_cmd_executor(self, cmd_string):
+        """
+        This is conveyor, split cmd_string to cmd list, if it is needed,
+        then run cmd one-by-one, and send previous response to next cmd
+        :param cmd_string:
+        :return response_text
+        """
         response_text = self.enm_execute(cmd_string.split(self.conveyor_delimeter)[0])
         # if there are conveyor delimeter in cmd_string and first command execution done, start conveyor
         if len(cmd_string.split(self.conveyor_delimeter)) > 1 and len(response_text) > 0:
@@ -205,10 +233,12 @@ Extended help command:'''
                     response_text = self.subprocess_cmd(conveyor_cmd, response_text)
         return response_text
 
-    # This method check cli command, parse and refer to terminal_execute for running command.
-    # refer to _check_cmd_permission for check permissions
-    # refer to _add_cmd_to_log for save files to log
     def enm_execute(self, cmd_string):
+        """
+        This method check cli command, parse and refer to terminal_execute for running command.
+        refer to _check_cmd_permission for check permissions
+        refer to _add_cmd_to_log for save files to log
+        """
         terminal = self.enm_session.terminal()
         response_text = ''
         response = None
@@ -245,15 +275,23 @@ Extended help command:'''
                     response_text = response_text + '\nfile downloaded ' + os.getcwd() + '/' + enm_file.get_name()
         return response_text
 
-    # dummy method for readline
     def _completion_display_matches_pass(self, substitution, matches_list, longest_match_length):
+        """
+        dummy method for readline
+        :param substitution:
+        :param matches_list:
+        :param longest_match_length:
+        :return:
+        """
         pass
 
-    # readline TAB help align value
-    completer_space_count_before_text = 20
-
-    # command completion method for readline
     def _cli_completer(self, text, state):
+        """
+        command completion method for readline
+        :param text:
+        :param state:
+        :return:
+        """
         word_n = len(text.split(' '))
         completer_list = []
         if state == 0 and word_n == 0:
@@ -277,8 +315,11 @@ Extended help command:'''
         else:
             return completer_list[0].split('@')[0].replace('\n', '') + ' '
 
-    # support method, get completer_array
     def _get_cli_completer_array(self):
+        """
+        support method, get completer_array
+        :return:
+        """
         try:
             if os.path.exists(self.completerFileName):
                 completer_array = []
@@ -292,8 +333,13 @@ Extended help command:'''
             print(e)
             return [None]
 
-    # support method, get command permissions
     def _check_cmd_permission(self, cmd_string, username):
+        """
+        support method, get command permissions
+        :param cmd_string:
+        :param username:
+        :return:
+        """
         return_value = 'permit'
         user_group = 'default'
         if not self.UnprotectedMode:
@@ -320,8 +366,14 @@ Extended help command:'''
                     'cli.py script error during check permission!'
         return return_value
 
-    # support method, send command to logs
     def _add_cmd_to_log(self, cmd_string, username, return_value):
+        """
+        support method, send command to logs
+        :param cmd_string:
+        :param username:
+        :param return_value:
+        :return:
+        """
         if not os.path.exists(self.unsafe_log_dir):
             os.mkdir(self.unsafe_log_dir)
         try:
@@ -341,9 +393,17 @@ Extended help command:'''
             print("Cant write log to " + self.unsafe_log_dir)
         return False
 
-    # This method using to read command file and send command to enm terminal.
-    # Commands need to pass enm_execute permission check!
     def execute_cmd_file(self, cmd_file_name, out_file_name='', enm_url='', enm_login='', enm_password=''):
+        """
+        This method using to read command file and send command to enm terminal.
+        Commands need to pass enm_execute permission check!
+        :param cmd_file_name:
+        :param out_file_name:
+        :param enm_url:
+        :param enm_login:
+        :param enm_password:
+        :return:
+        """
         # prepare sessions and cli options
         self.initialize_enm_session(enm_url=enm_url, enm_login=enm_login, enm_password=enm_password)
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
@@ -364,8 +424,12 @@ Extended help command:'''
             file_out.close()
         enmscripting.close(self.enm_session)
 
-    # This method print extended manual page from extend_manual_file_name
     def print_extend_manual(self, question):
+        """
+        This method print extended manual page from extend_manual_file_name
+        :param question:
+        :return:
+        """
         with open(self.extend_manual_file_name, 'r') as help_file:
             help_list = help_file.read().split('@@@@@')
             help_found = False
@@ -383,15 +447,21 @@ Extended help command:'''
                         if help.split('@@@@')[0].find(question) > -1:
                             print(" " * len(self.cliInputString) + help.split('@@@@')[0])
 
-    # This special static method!
-    # Move logfiles data from unsafe dir to safe dir!
-    # Do not overwrite data in safe dir!
-    # Remove old file in unsafe dir!
-    # Execution may be croned with root or equal permissions to copy unprotected log to protected log dir!
-    # for example:
-    # */1 * * * * /usr/bin/python /home/shared/protected_user/cli_safe_log.py
     @staticmethod
     def cli_log_copy_to_safe(unsafe_log_dir, safe_log_dir, obsolescence_days):
+        """
+        This special static method!
+        Move logfiles data from unsafe dir to safe dir!
+        Do not overwrite data in safe dir!
+        Remove old file in unsafe dir!
+        Execution may be croned with root or equal permissions to copy unprotected log to protected log dir!
+        for example:
+        */1 * * * * /usr/bin/python /home/shared/protected_user/cli_safe_log.py
+        :param unsafe_log_dir:
+        :param safe_log_dir:
+        :param obsolescence_days:
+        :return:
+        """
         try:
             for file_name in os.listdir(unsafe_log_dir):
                 if obsolescence_days < 1:
@@ -410,9 +480,13 @@ Extended help command:'''
             print(e)
             return False
 
-    # encode utf to ASCII, replace undefined to " "
     @staticmethod
     def _utf8_chars_to_space(string):
+        """
+        encode utf to ASCII, replace undefined to " "
+        :param string:
+        :return:
+        """
         ss = ""
         for i in string:
             if ord(i) < 127:
@@ -421,9 +495,12 @@ Extended help command:'''
                 ss = ss + " "
         return ss
 
-    # open and return internal ENM session
     @staticmethod
     def open_int_enm_session():
+        """
+        open and return internal ENM session
+        :return:
+        """
         try:
             enm_session = enmscripting.open()
             return enm_session
@@ -431,9 +508,15 @@ Extended help command:'''
             print(e)
             return None
 
-    # open and return external ENM session
     @staticmethod
     def open_ext_enm_session(enm_address='', login='', password=''):
+        """
+        open and return external ENM session
+        :param enm_address:
+        :param login:
+        :param password:
+        :return:
+        """
         try:
             session = enmscripting.private.session.ExternalSession(enm_address)
             enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(session)
@@ -444,9 +527,14 @@ Extended help command:'''
             print(e)
             return None
 
-    # execute shell command and return response
     @staticmethod
     def subprocess_cmd(command, insert_to_stdin=''):
+        """
+        execute shell command and return response
+        :param command:
+        :param insert_to_stdin:
+        :return:
+        """
         process = subprocess.Popen(command, stdout=subprocess.PIPE,
                                    stdin=subprocess.PIPE, shell=True)
         proc_stdout = process.communicate(insert_to_stdin)[0].strip()
