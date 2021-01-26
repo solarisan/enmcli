@@ -40,19 +40,19 @@ For more info about cli command use web-help, TAB or "manual "!
 For question about cli.py contact or innightwolfsleep@yandex.ru
 Extended help command:'''
     enm_session = None
-    cliInputString = 'CLI> '
+    cli_input_string = 'CLI> '
     conveyor_to_cli_prefix = 'cli>'
     conveyor_delimeter = '|'
-    maxAutoCliCmdInBashSequence = 30
+    max_conveyor_cmd_ask_user = 30
     cli_history_file_name = '~/.cliHistory'
-    UserFileName = '/CLI_ENM_UserGroup.csv'
-    PolicyFileName = '/CLI_ENM_UserRestrictPolicy.csv'
-    UnprotectedMode = False
+    user_group_file_name = '/CLI_ENM_UserGroup.csv'
+    restrict_policy_file_name = '/CLI_ENM_UserRestrictPolicy.csv'
+    unprotected_mode = False
     extend_manual_file_name = '/CLI_ENM_help.csv'
     unsafe_log_dir = '/cli_log/'
     safe_log_dir = '/cli_safelog/'
-    completerFileName = '/CLI_ENM_Completer.csv'
-    completerArray = []
+    completer_file_name = '/CLI_ENM_Completer.csv'
+    completer_line_list = []
     completer_space_count_before_text = 20
 
     def __init__(self, cli_dir):
@@ -61,13 +61,13 @@ Extended help command:'''
         :param cli_dir:
         """
         self.cli_history_file_name = os.path.expanduser(self.cli_history_file_name)
-        self.UserFileName = cli_dir + self.UserFileName
-        self.PolicyFileName = cli_dir + self.PolicyFileName
+        self.user_group_file_name = cli_dir + self.user_group_file_name
+        self.restrict_policy_file_name = cli_dir + self.restrict_policy_file_name
         self.extend_manual_file_name = cli_dir + self.extend_manual_file_name
         self.unsafe_log_dir = cli_dir + self.unsafe_log_dir
         self.safe_log_dir = cli_dir + self.safe_log_dir
-        self.completerFileName = cli_dir + self.completerFileName
-        self.completerArray = self._get_cli_completer_array()
+        self.completer_file_name = cli_dir + self.completer_file_name
+        self.completer_line_list = self._get_cli_completer_array()
 
     def start(self, sys_args, unprotected_mode=False):
         """
@@ -76,7 +76,7 @@ Extended help command:'''
         :param unprotected_mode:
         :return:
         """
-        self.UnprotectedMode = unprotected_mode
+        self.unprotected_mode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if len(sys_args) > 1:
             if sys_args[1] == '-c' and len(sys_args) > 2:
@@ -188,7 +188,7 @@ Extended help command:'''
             try:
                 if file_out_name is not None and len(response_text) > 0:
                     with open(file_out_name, 'a') as file_out:
-                        file_out.write('\n' + self.cliInputString + cmd_string + '\n' + response_text)
+                        file_out.write('\n' + self.cli_input_string + cmd_string + '\n' + response_text)
             except Exception as e:
                 print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), e)
             try:
@@ -198,7 +198,7 @@ Extended help command:'''
             if run_single_cmd:
                 break
             # start input for next iteration
-            cmd_string = raw_input(self.cliInputString)
+            cmd_string = raw_input(self.cli_input_string)
         return enmscripting.close(self.enm_session)
 
     def _conveyor_cmd_executor(self, cmd_string):
@@ -217,7 +217,7 @@ Extended help command:'''
                     next_cmd_list = response_text.split('\n')
                     response_text = ''
                     cmd_length_ok = 'y'
-                    if len(next_cmd_list) > self.maxAutoCliCmdInBashSequence:
+                    if len(next_cmd_list) > self.max_conveyor_cmd_ask_user:
                         cmd_length_ok = \
                             raw_input('It is ' + str(len(next_cmd_list)) +
                                       ' cli commands in sequence. Too much! Are you sure? (y/n): ')
@@ -295,20 +295,20 @@ Extended help command:'''
         word_n = len(text.split(' '))
         completer_list = []
         if state == 0 and word_n == 0:
-            for line in self.completerArray:
+            for line in self.completer_line_list:
                 if len(line.split('@')[0].split(' ')) == 1:
                     completer_list.append(line)
         if state == 0 and word_n > 0:
-            for line in self.completerArray:
+            for line in self.completer_line_list:
                 if len(line.split('@')[0].split(' ')) == word_n and line.startswith(text) and not line.startswith('@'):
                     completer_list.append(line)
         for line in completer_list:
             out_line = line.replace('@', ' ' * (self.completer_space_count_before_text - len(line.split('@')[0])))
             out_line = out_line.replace('\n', '').replace('\r', '')
-            out_line = ' ' * len(self.cliInputString) + out_line
+            out_line = ' ' * len(self.cli_input_string) + out_line
             sys.stdout.write('\n' + out_line)
             sys.stdout.flush()
-        sys.stdout.write('\n' + self.cliInputString + readline.get_line_buffer(), )
+        sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
         sys.stdout.flush()
         if len(completer_list) > 1:
             return None
@@ -321,9 +321,9 @@ Extended help command:'''
         :return:
         """
         try:
-            if os.path.exists(self.completerFileName):
+            if os.path.exists(self.completer_file_name):
                 completer_array = []
-                with open(self.completerFileName, 'r') as completer_file:
+                with open(self.completer_file_name, 'r') as completer_file:
                     for line in completer_file:
                         completer_array.append(line)
                 return completer_array
@@ -342,17 +342,17 @@ Extended help command:'''
         """
         return_value = 'permit'
         user_group = 'default'
-        if not self.UnprotectedMode:
+        if not self.unprotected_mode:
             try:
-                if os.path.exists(self.UserFileName):
-                    with open(self.UserFileName, 'r') as user_file:
+                if os.path.exists(self.user_group_file_name):
+                    with open(self.user_group_file_name, 'r') as user_file:
                         for line in user_file:
                             if line.split(';')[0] == username:
                                 user_group = line.split(';')[1].replace('\n', '').replace('\r', '')
                 else:
                     return_value = 'cant find UserFile'
-                if os.path.exists(self.PolicyFileName):
-                    with open(self.PolicyFileName, 'r') as policy_file:
+                if os.path.exists(self.restrict_policy_file_name):
+                    with open(self.restrict_policy_file_name, 'r') as policy_file:
                         for line in policy_file:
                             if line.split(';')[0] == user_group:
                                 if re.search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
@@ -413,10 +413,10 @@ Extended help command:'''
             file_out = open(out_file_name.replace(' ', ''), 'a')
         for line in lines:
             response_text = self.enm_execute(line)
-            print('\n' + self.cliInputString + line + '\n' + response_text)
+            print('\n' + self.cli_input_string + line + '\n' + response_text)
             try:
                 if file_out is not None:
-                    file_out.write('\n' + self.cliInputString + line + '\n' + response_text)
+                    file_out.write('\n' + self.cli_input_string + line + '\n' + response_text)
             except Exception as e:
                 print(e)
                 print("Cant write log!!!")
@@ -445,7 +445,7 @@ Extended help command:'''
                 for help in help_list:
                     if help.find('@@@@') >= 0:
                         if help.split('@@@@')[0].find(question) > -1:
-                            print(" " * len(self.cliInputString) + help.split('@@@@')[0])
+                            print(" " * len(self.cli_input_string) + help.split('@@@@')[0])
 
     @staticmethod
     def cli_log_copy_to_safe(unsafe_log_dir, safe_log_dir, obsolescence_days):
