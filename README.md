@@ -12,6 +12,8 @@ ____________________________________________________
 
 - cli_save_log.py - aditional utility, will move user logs from unsafe log dirrectory to safe directory. May be croned for each minute.
 
+- cli_cmd_all.py - utility will run single cli command from arguments on several external ENM (list in code)
+
 - enmcli.py - contains main code
 
 CLI_ENM_* files - additional completers, manuals and user restrction rules:
