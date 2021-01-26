@@ -1,7 +1,7 @@
 # enm_cli
 Allow ti use Ericsson Network Management Command Line Interface via terminal (for example, ssh terminal via putty).
 
-May open internal enm session (when using directly on ENM scripting VM) or external enm session (when using on any Linux system)/
+May open internal enm session (when using directly on ENM scripting VM) or external enm session (when using on any Linux system, need import enmscripting module from ENM)
 
 Simple way to start using - copy enmcli/ to you $HOME directory on ENM scripting VM and run cli_start.py.
 
