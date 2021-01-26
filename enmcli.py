@@ -65,7 +65,7 @@ Extended help command:'''
         self.completerArray = self._get_cli_completer_array()
 
     # This method for beginning to starts CLI shell - parse input args and go to initialize_shell
-    def start(self, sys_args=[], unprotected_mode=False):
+    def start(self, sys_args, unprotected_mode=False):
         self.UnprotectedMode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if len(sys_args) > 1:
@@ -122,7 +122,6 @@ Extended help command:'''
     # This is main method. This starts infinite raw_input loop, contain commands parser.
     # refer to _conveyor_cmd_executor running cli commands
     def _infinite_cli_loop(self, first_cmd='', run_single_cmd=False):
-        terminal = self.enm_session.terminal()
         file_out_name = None
         cmd_string = first_cmd
         # this is a loop if cmd_string not "quit"
@@ -159,7 +158,7 @@ Extended help command:'''
                 else:
                     print('logfile already unset')
             elif len(cmd_string) > 0:
-                response_text = self._conveyor_cmd_executor(terminal, cmd_string)
+                response_text = self._conveyor_cmd_executor(cmd_string)
                 print(self._utf8_chars_to_space(response_text))
             # try to write log&history files
             try:
@@ -180,8 +179,8 @@ Extended help command:'''
 
     # conveyor split cmd_string to cmd list, if it is needed,
     # then run cmd one-by-one, and send previous response to next cmd
-    def _conveyor_cmd_executor(self, terminal, cmd_string):
-        response_text = self._terminal_cmd_execute(terminal, cmd_string.split(self.conveyor_delimeter)[0])
+    def _conveyor_cmd_executor(self, cmd_string):
+        response_text = self.enm_execute(cmd_string.split(self.conveyor_delimeter)[0])
         # if there are conveyor delimeter in cmd_string and first command execution done, start conveyor
         if len(cmd_string.split(self.conveyor_delimeter)) > 1 and len(response_text) > 0:
             conveyor_cmd_list = cmd_string.split(self.conveyor_delimeter)[1:]
@@ -198,7 +197,7 @@ Extended help command:'''
                         for next_cmd in next_cmd_list:
                             next_cmd = next_cmd.replace('\r', '').replace('\n', '')
                             response_text = \
-                                response_text + "\n" + self._terminal_cmd_execute(terminal, next_cmd)
+                                response_text + "\n" + self.enm_execute(next_cmd)
                     else:
                         response_text = 'Aborted by user! Too much cli command in sequence! It is ' \
                                         + str(len(next_cmd_list)) + 'cmd!'
@@ -206,10 +205,11 @@ Extended help command:'''
                     response_text = self.subprocess_cmd(conveyor_cmd, response_text)
         return response_text
 
-    # This method check cli command, parse and refer to terminal_cmd for running command.
+    # This method check cli command, parse and refer to terminal_execute for running command.
     # refer to _check_cmd_permission for check permissions
     # refer to _add_cmd_to_log for save files to log
-    def _terminal_cmd_execute(self, terminal, cmd_string):
+    def enm_execute(self, cmd_string):
+        terminal = self.enm_session.terminal()
         response_text = ''
         response = None
         try:
@@ -228,10 +228,10 @@ Extended help command:'''
                         else:
                             file_up = open(file_to_upload, 'rb')
                             cmd_string = cmd_string.replace(file_to_upload, os.path.basename(file_to_upload))
-                            response = self.terminal_cmd(terminal, cmd_string, file_up)
+                            response = terminal.execute(cmd_string, file_up)
                             response_text = '\n'.join(response.get_output())
                     else:
-                        response = self.terminal_cmd(terminal, cmd_string)
+                        response = terminal.execute(cmd_string)
                         response_text = '\n'.join(response.get_output())
                 else:
                     response_text = '\n Command "' + cmd_string + '" not permitted!\n' + cmd_permission
@@ -342,18 +342,17 @@ Extended help command:'''
         return False
 
     # This method using to read command file and send command to enm terminal.
-    # Commands need to pass _terminal_cmd_execute permission check!
+    # Commands need to pass enm_execute permission check!
     def execute_cmd_file(self, cmd_file_name, out_file_name='', enm_url='', enm_login='', enm_password=''):
         # prepare sessions and cli options
         self.initialize_enm_session(enm_url=enm_url, enm_login=enm_login, enm_password=enm_password)
-        terminal = self.enm_session.terminal()
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
             lines = file_in.readlines()
         file_out = None
         if len(out_file_name.replace(' ', '')) > 2:
             file_out = open(out_file_name.replace(' ', ''), 'a')
         for line in lines:
-            response_text = self._terminal_cmd_execute(terminal, line)
+            response_text = self.enm_execute(line)
             print('\n' + self.cliInputString + line + '\n' + response_text)
             try:
                 if file_out is not None:
@@ -444,14 +443,6 @@ Extended help command:'''
         except Exception as e:
             print(e)
             return None
-
-    # execute cli terminal command and return response
-    @staticmethod
-    def terminal_cmd(terminal, cmd_string, opened_binary_file=None):
-        if opened_binary_file is None:
-            return terminal.execute(cmd_string)
-        else:
-            return terminal.execute(cmd_string, opened_binary_file)
 
     # execute shell command and return response
     @staticmethod
