@@ -40,6 +40,7 @@ For more info about cli command use web-help, TAB or "manual "!
 For question about cli.py contact or innightwolfsleep@yandex.ru
 Extended help command:'''
     enm_session = None
+    completer_list = []
     cli_input_string = 'CLI> '
     conveyor_to_cli_prefix = 'cli>'
     conveyor_delimeter = '|'
@@ -157,7 +158,7 @@ Extended help command:'''
             elif cmd_string.startswith('manual') or cmd_string.startswith('help'):
                 self.print_extend_manual(cmd_string)
             elif cmd_string.startswith('?'):
-                print('Use TAB or "help" or "manual"!')
+                print('Use TAB or "help" or "help <command>" or "manual <command>"!')
             elif cmd_string.startswith('execute file:'):
                 try:
                     self.execute_cmd_file(cmd_string[13:])
@@ -383,26 +384,49 @@ Extended help command:'''
         :param state:
         :return:
         """
-        word_n = len(text.split(' '))
-        completer_list = []
-        if word_n == 0:
-            for line in self.completer_line_list:
-                if len(line.split('@')[0].split(' ')) == 1:
-                    completer_list.append(line)
-        if word_n > 0:
-            for line in self.completer_line_list:
-                if len(line.split('@')[0].split(' ')) == word_n and line.startswith(text) and not line.startswith('@'):
-                    completer_list.append(line)
-        line = completer_list[state]
-        out_line = line.replace('@', ' ' * (self.completer_space_count_before_text - len(line.split('@')[0])))
-        out_line = out_line.replace('\n', '').replace('\r', '')
-        out_line = ' ' * len(self.cli_input_string) + out_line
-        sys.stdout.write('\n' + out_line)
-        sys.stdout.flush()
-        if state == len(completer_list) - 1:
-            sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
+        try:
+            word_n = len(text.split(' '))
+            cmedit_get_flag = False
+            if state == 0:
+                if text.startswith("cmedit get "):
+                    cmedit_get_flag = True
+                    fdn = text[11:]
+                    new_completer_list = map(lambda x: "cmedit get " + x, self.get_fdn_childs_list(fdn))
+                    if new_completer_list:
+                        self.completer_list = new_completer_list
+                    else:
+                        for i in self.completer_list:
+                            if i.find(text) == 0:
+                                new_completer_list.append(i)
+                        if new_completer_list:
+                            self.completer_list = new_completer_list
+                elif word_n == 0:
+                    self.completer_list = []
+                    for line in self.completer_line_list:
+                        if len(line.split('@')[0].split(' ')) == 1:
+                            self.completer_list.append(line)
+                elif word_n > 0:
+                    self.completer_list = []
+                    for line in self.completer_line_list:
+                        if len(line.split('@')[0].split(' ')) == word_n \
+                                and line.startswith(text) \
+                                and not line.startswith('@'):
+                            self.completer_list.append(line)
+            out_line = self.completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
+                                                                      len(self.completer_list[state].split('@')[0])))
+            out_line = out_line.replace('\n', '').replace('\r', '')
+            out_line = ' ' * len(self.cli_input_string) + out_line
+            sys.stdout.write('\n' + out_line)
             sys.stdout.flush()
-        return completer_list[state].split('@')[0].replace('\n', '') + ' '
+            if state == len(self.completer_list) - 1:
+                sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
+                sys.stdout.flush()
+            if cmedit_get_flag:
+                return self.completer_list[state].split('@')[0].replace('\n', '')
+            else:
+                return self.completer_list[state].split('@')[0].replace('\n', '') + ' '
+        except Exception:
+            return None
 
     def _get_cli_completer_array(self):
         """
@@ -422,10 +446,41 @@ Extended help command:'''
             print(e)
             return [None]
 
-    def get_mo_data(self, ne_name, mo_name='', mo_attr=''):
+    def get_fdn_childs_list(self, fdn):
         """
         """
-        terminal = self.enm_session.terminal()
+        try:
+            fdn_list = []
+            terminal = self.enm_session.terminal()
+            if len(fdn) < 1:
+                return ["SubNetwork"]
+            else:
+                ne_type = fdn.split(',')[-1].split('=')[0]
+                ne_name = fdn.split(',')[-1].split('=')[-1]
+                if fdn.find("MeContext=") > -1:
+                    ne_name = fdn.split("MeContext=")[-1].split(",")[0]
+                    cmd_string = "cmedit get " + ne_name + " " + ne_type + ",*"
+                elif fdn == "SubNetwork":
+                    cmd_string = "cmedit get * SubNetwork,SubNetwork"
+                else:
+                    cmd_string = "cmedit get * SubNetwork.SubNetworkId==" + ne_name + ",*"
+                # print(fdn,ne_type,ne_name,cmd_string)
+                response = terminal.execute(cmd_string)
+                for line in response.get_output():
+                    if line.startswith("FDN : "):
+                        if fdn != line.split(" ")[2]:
+                            fdn_list.append(line.split(" ")[2])
+                if fdn.split('=')[-1].find(',') < 0:
+                    new_fdn_list = []
+                    for i in fdn_list:
+                        if i.find(fdn) == 0:
+                            new_fdn_list.append(i)
+                    if new_fdn_list:
+                        fdn_list = new_fdn_list
+                return fdn_list
+        except Exception as e:
+            print(e)
+            return None
 
     def print_extend_manual(self, question):
         """
