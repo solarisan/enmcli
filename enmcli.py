@@ -131,7 +131,7 @@ Extended help command:'''
         readline.parse_and_bind('tab: complete')
         readline.set_completer_delims('')
         readline.set_completer(self._cli_completer)
-        readline.set_completion_display_matches_hook(self._completion_display_matches_pass)
+        readline.set_completion_display_matches_hook(self._completion_display_matches)
         if not os.path.exists(self.cli_history_file_name):
             cli_history_file = open(self.cli_history_file_name, 'w')
             cli_history_file.close()
@@ -275,64 +275,6 @@ Extended help command:'''
                     response_text = response_text + '\nfile downloaded ' + os.getcwd() + '/' + enm_file.get_name()
         return response_text
 
-    def _completion_display_matches_pass(self, substitution, matches_list, longest_match_length):
-        """
-        dummy method for readline
-        :param substitution:
-        :param matches_list:
-        :param longest_match_length:
-        :return:
-        """
-        pass
-
-    def _cli_completer(self, text, state):
-        """
-        command completion method for readline
-        :param text:
-        :param state:
-        :return:
-        """
-        word_n = len(text.split(' '))
-        completer_list = []
-        if state == 0 and word_n == 0:
-            for line in self.completer_line_list:
-                if len(line.split('@')[0].split(' ')) == 1:
-                    completer_list.append(line)
-        if state == 0 and word_n > 0:
-            for line in self.completer_line_list:
-                if len(line.split('@')[0].split(' ')) == word_n and line.startswith(text) and not line.startswith('@'):
-                    completer_list.append(line)
-        for line in completer_list:
-            out_line = line.replace('@', ' ' * (self.completer_space_count_before_text - len(line.split('@')[0])))
-            out_line = out_line.replace('\n', '').replace('\r', '')
-            out_line = ' ' * len(self.cli_input_string) + out_line
-            sys.stdout.write('\n' + out_line)
-            sys.stdout.flush()
-        sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
-        sys.stdout.flush()
-        if len(completer_list) > 1:
-            return None
-        else:
-            return completer_list[0].split('@')[0].replace('\n', '') + ' '
-
-    def _get_cli_completer_array(self):
-        """
-        support method, get completer_array
-        :return:
-        """
-        try:
-            if os.path.exists(self.completer_file_name):
-                completer_array = []
-                with open(self.completer_file_name, 'r') as completer_file:
-                    for line in completer_file:
-                        completer_array.append(line)
-                return completer_array
-            else:
-                return [None]
-        except Exception as e:
-            print(e)
-            return [None]
-
     def _check_cmd_permission(self, cmd_string, username):
         """
         support method, get command permissions
@@ -423,6 +365,67 @@ Extended help command:'''
         if file_out is not None:
             file_out.close()
         enmscripting.close(self.enm_session)
+
+    def _completion_display_matches(self, substitution, matches_list, longest_match_length):
+        """
+        dummy method for readline, for future use
+        :param substitution:
+        :param matches_list:
+        :param longest_match_length:
+        :return:
+        """
+        pass
+
+    def _cli_completer(self, text, state):
+        """
+        command completion method for readline
+        :param text:
+        :param state:
+        :return:
+        """
+        word_n = len(text.split(' '))
+        completer_list = []
+        if word_n == 0:
+            for line in self.completer_line_list:
+                if len(line.split('@')[0].split(' ')) == 1:
+                    completer_list.append(line)
+        if word_n > 0:
+            for line in self.completer_line_list:
+                if len(line.split('@')[0].split(' ')) == word_n and line.startswith(text) and not line.startswith('@'):
+                    completer_list.append(line)
+        line = completer_list[state]
+        out_line = line.replace('@', ' ' * (self.completer_space_count_before_text - len(line.split('@')[0])))
+        out_line = out_line.replace('\n', '').replace('\r', '')
+        out_line = ' ' * len(self.cli_input_string) + out_line
+        sys.stdout.write('\n' + out_line)
+        sys.stdout.flush()
+        if state == len(completer_list) - 1:
+            sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
+            sys.stdout.flush()
+        return completer_list[state].split('@')[0].replace('\n', '') + ' '
+
+    def _get_cli_completer_array(self):
+        """
+        support method, get completer_array
+        :return:
+        """
+        try:
+            if os.path.exists(self.completer_file_name):
+                completer_array = []
+                with open(self.completer_file_name, 'r') as completer_file:
+                    for line in completer_file:
+                        completer_array.append(line)
+                return completer_array
+            else:
+                return [None]
+        except Exception as e:
+            print(e)
+            return [None]
+
+    def get_mo_data(self, ne_name, mo_name='', mo_attr=''):
+        """
+        """
+        terminal = self.enm_session.terminal()
 
     def print_extend_manual(self, question):
         """
