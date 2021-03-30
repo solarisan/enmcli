@@ -400,6 +400,7 @@ Extended help command:'''
                                 new_completer_list.append(i)
                         if new_completer_list:
                             self.completer_list = new_completer_list
+                    self.completer_list.sort()
                 elif word_n == 0:
                     self.completer_list = []
                     for line in self.completer_line_list:
