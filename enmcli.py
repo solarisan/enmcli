@@ -454,35 +454,51 @@ Extended help command:'''
             fdn_list = []
             terminal = self.enm_session.terminal()
             if len(fdn) < 1:
-                return ["SubNetwork"]
-            else:
-                ne_type = fdn.split(',')[-1].split('=')[0]
-                ne_name = fdn.split(',')[-1].split('=')[-1]
-                if fdn.find("MeContext=") > -1:
-                    ne_name = fdn.split("MeContext=")[-1].split(",")[0]
-                    cmd_string = "cmedit get " + ne_name + " " + ne_type + ",*"
-                elif fdn == "SubNetwork":
-                    cmd_string = "cmedit get * SubNetwork,SubNetwork"
+                return ["SubNetwork","NetworkElement"]
+            if fdn.find("MeContext=") > -1:
+                ne_name = fdn.split("MeContext=")[-1].split(",")[0]
+                if fdn[-1] == ",":
+                    cmd_string = "cmedit get " + fdn[:-1]
                 else:
-                    cmd_string = "cmedit get * SubNetwork.SubNetworkId==" + ne_name + ",*"
-                # print(fdn,ne_type,ne_name,cmd_string)
+                    cmd_string = "cmedit get " + fdn
                 response = terminal.execute(cmd_string)
-                for line in response.get_output():
-                    if line.startswith("FDN : "):
-                        if fdn != line.split(" ")[2]:
-                            fdn_list.append(line.split(" ")[2])
-                if fdn.split('=')[-1].find(',') < 0:
-                    new_fdn_list = []
-                    for i in fdn_list:
-                        if i.find(fdn) == 0:
-                            new_fdn_list.append(i)
-                    if new_fdn_list:
-                        fdn_list = new_fdn_list
-                return fdn_list
+                if response.get_output()[-1] == "1 instance(s)":
+                    mo_type = fdn.split(',')[-1].split('=')[0]
+                    mo_name = fdn.split(',')[-1].split('=')[-1]
+                    cmd_string = "cmedit get " + ne_name + " " + mo_type + "." + mo_type + "Id==" + mo_name + ",*"
+                else:
+                    parent_mo_type = fdn.split(',')[-2].split('=')[0]
+                    cmd_string = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
+            elif fdn=="NetworkElement":
+                cmd_string = "cmedit get * NetworkElement"
+            elif fdn.startswith("NetworkElement="):
+                ne_name = fdn.split('=')[-1]
+                response = terminal.execute("cmedit get " + fdn)
+                if response.get_output()[-1] == "1 instance(s)":
+                    cmd_string = "cmedit get " + ne_name + " NetworkElement,*"
+                else:
+                    cmd_string = "cmedit get " + ne_name + "* NetworkElement"
+            elif fdn == "SubNetwork":
+                cmd_string = "cmedit get * SubNetwork,SubNetwork"
+            else:
+                mo_name = fdn.split(',')[-1].split('=')[-1]
+                cmd_string = "cmedit get * SubNetwork.SubNetworkId==" + mo_name + ",*"
+            response = terminal.execute(cmd_string)
+            for line in response.get_output():
+                if line.startswith("FDN : "):
+                    if fdn != line.split(" ")[2]:
+                        fdn_list.append(line.split(" ")[2])
+            filtered_fdn_list = []
+            for i in fdn_list:
+                if i.find(fdn) == 0:
+                    filtered_fdn_list.append(i)
+            if filtered_fdn_list:
+                fdn_list = filtered_fdn_list
+            return fdn_list
         except Exception as e:
-            print(e)
+            print("get_fdn_childs_list", e)
             return None
-
+            
     def print_extend_manual(self, question):
         """
         This method print extended manual page from extend_manual_file_name
