@@ -401,7 +401,6 @@ Extended help command:'''
                                 new_completer_list.append(i)
                         if new_completer_list:
                             self._completer_list = new_completer_list
-                    self._completer_list.sort()
                 elif word_n == 0:
                     self._completer_list = []
                     for line in self._completer_line_list:
@@ -455,20 +454,21 @@ Extended help command:'''
         try:
             fdn = fdn[:-1] + fdn[-1:].replace(",","")
             terminal = self.enm_session.terminal()
-            # prepare ne_name
             if len(fdn) < 1 or "SubNetwor".startswith(fdn):
                 return ["SubNetwork"]
+            # get SubNetwork list
+            if fdn.split(",")[-1].startswith("SubNetwork"):
+                cmd = "cmedit get * SubNetwork"
+            # prepare ne_name
+            ne_name = "*"
             if fdn.find("MeContext=") > -1:
                 ne_name = fdn.split("MeContext=")[-1].split(",")[0]
             elif fdn.startswith("NetworkElement="):
                 ne_name = fdn.split('NetworkElement=')[-1]
-            else:
-                ne_name = "*"
             if ne_name == "":
                 ne_name = "*"
             # check direct FDN
             response = terminal.execute("cmedit get " + fdn)
-            # prepare cmd
             if response.get_output()[-1] == "1 instance(s)":
                 mo_type = fdn.split(',')[-1].split('=')[0]
                 mo_name = fdn.split(',')[-1].split('=')[-1]
@@ -476,11 +476,10 @@ Extended help command:'''
             elif "," in fdn:
                 parent_mo_type = fdn.split(',')[-2].split('=')[0]
                 cmd = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
-            if fdn == "SubNetwork":
-                cmd = "cmedit get * SubNetwork"
-            if fdn.split(",")[-1].startswith("SubNetwork="):
-                mo_name = fdn.split('SubNetwork=')[-1]
-                cmd = "cmedit get * SubNetwork.SubNetworkId==" + mo_name + ",*"
+            else:
+                mo_type = fdn.split(',')[-1].split('=')[0]
+                mo_name = fdn.split(',')[-1].split('=')[-1]
+                cmd = "cmedit get " + ne_name + " " + mo_type
             # get fdn list
             fdn_list = []
             response = terminal.execute(cmd)
@@ -488,8 +487,12 @@ Extended help command:'''
                 if line.startswith("FDN : "):
                     line_fdn = line.split("FDN : ")[-1]
                     if fdn != line_fdn and line_fdn.find(fdn) == 0:
-                        fdn_list.append(line.split(" ")[2])
-            return fdn_list
+                        if not "," in line_fdn[len(fdn) + 1:]:
+                            fdn_list.append(line_fdn)
+            if fdn_list:
+                fdn_list = list(set(fdn_list))
+                fdn_list.sort()
+                return fdn_list
         except Exception as e:
             print("get_fdn_childs_list", e)
             return None
