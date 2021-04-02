@@ -39,8 +39,10 @@ Use "cli>" in bash conveyor for send output to next cli command. Example:
 For more info about cli command use web-help, TAB or "manual "! 
 For question about cli.py contact or innightwolfsleep@yandex.ru
 Extended help command:'''
+    _cli_completer_text = "123456789"
+    _completer_line_list = []
+    _completer_list = []
     enm_session = None
-    completer_list = []
     cli_input_string = 'CLI> '
     conveyor_to_cli_prefix = 'cli>'
     conveyor_delimeter = '|'
@@ -53,7 +55,6 @@ Extended help command:'''
     unsafe_log_dir = '/cli_log/'
     safe_log_dir = '/cli_safelog/'
     completer_file_name = '/CLI_ENM_Completer.csv'
-    completer_line_list = []
     completer_space_count_before_text = 20
 
     def __init__(self, cli_dir):
@@ -68,7 +69,7 @@ Extended help command:'''
         self.unsafe_log_dir = cli_dir + self.unsafe_log_dir
         self.safe_log_dir = cli_dir + self.safe_log_dir
         self.completer_file_name = cli_dir + self.completer_file_name
-        self.completer_line_list = self._get_cli_completer_array()
+        self._completer_line_list = self._get_cli_completer_array()
 
     def start(self, sys_args, unprotected_mode=False):
         """
@@ -387,45 +388,46 @@ Extended help command:'''
         try:
             word_n = len(text.split(' '))
             cmedit_get_flag = False
-            if state == 0:
+            if state == 0 and text != self._cli_completer_text:
                 if text.startswith("cmedit get "):
                     cmedit_get_flag = True
                     fdn = text[11:]
                     new_completer_list = map(lambda x: "cmedit get " + x, self.get_fdn_childs_list(fdn))
                     if new_completer_list:
-                        self.completer_list = new_completer_list
+                        self._completer_list = new_completer_list
                     else:
-                        for i in self.completer_list:
+                        for i in self._completer_list:
                             if i.find(text) == 0:
                                 new_completer_list.append(i)
                         if new_completer_list:
-                            self.completer_list = new_completer_list
-                    self.completer_list.sort()
+                            self._completer_list = new_completer_list
+                    self._completer_list.sort()
                 elif word_n == 0:
-                    self.completer_list = []
-                    for line in self.completer_line_list:
+                    self._completer_list = []
+                    for line in self._completer_line_list:
                         if len(line.split('@')[0].split(' ')) == 1:
-                            self.completer_list.append(line)
+                            self._completer_list.append(line)
                 elif word_n > 0:
-                    self.completer_list = []
-                    for line in self.completer_line_list:
+                    self._completer_list = []
+                    for line in self._completer_line_list:
                         if len(line.split('@')[0].split(' ')) == word_n \
                                 and line.startswith(text) \
                                 and not line.startswith('@'):
-                            self.completer_list.append(line)
-            out_line = self.completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
-                                                                      len(self.completer_list[state].split('@')[0])))
+                            self._completer_list.append(line)
+                self._cli_completer_text = text
+            out_line = self._completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
+                                                                      len(self._completer_list[state].split('@')[0])))
             out_line = out_line.replace('\n', '').replace('\r', '')
             out_line = ' ' * len(self.cli_input_string) + out_line
             sys.stdout.write('\n' + out_line)
             sys.stdout.flush()
-            if state == len(self.completer_list) - 1:
+            if state == len(self._completer_list) - 1:
                 sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
                 sys.stdout.flush()
             if cmedit_get_flag:
-                return self.completer_list[state].split('@')[0].replace('\n', '')
+                return self._completer_list[state].split('@')[0].replace('\n', '')
             else:
-                return self.completer_list[state].split('@')[0].replace('\n', '') + ' '
+                return self._completer_list[state].split('@')[0].replace('\n', '') + ' '
         except Exception:
             return None
 
@@ -451,49 +453,42 @@ Extended help command:'''
         """
         """
         try:
-            fdn_list = []
+            fdn = fdn[:-1] + fdn[-1:].replace(",","")
             terminal = self.enm_session.terminal()
-            if len(fdn) < 1:
-                return ["SubNetwork","NetworkElement"]
+            # prepare ne_name
+            if len(fdn) < 1 or "SubNetwor".startswith(fdn):
+                return ["SubNetwork"]
             if fdn.find("MeContext=") > -1:
                 ne_name = fdn.split("MeContext=")[-1].split(",")[0]
-                if fdn[-1] == ",":
-                    cmd_string = "cmedit get " + fdn[:-1]
-                else:
-                    cmd_string = "cmedit get " + fdn
-                response = terminal.execute(cmd_string)
-                if response.get_output()[-1] == "1 instance(s)":
-                    mo_type = fdn.split(',')[-1].split('=')[0]
-                    mo_name = fdn.split(',')[-1].split('=')[-1]
-                    cmd_string = "cmedit get " + ne_name + " " + mo_type + "." + mo_type + "Id==" + mo_name + ",*"
-                else:
-                    parent_mo_type = fdn.split(',')[-2].split('=')[0]
-                    cmd_string = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
-            elif fdn=="NetworkElement":
-                cmd_string = "cmedit get * NetworkElement"
             elif fdn.startswith("NetworkElement="):
-                ne_name = fdn.split('=')[-1]
-                response = terminal.execute("cmedit get " + fdn)
-                if response.get_output()[-1] == "1 instance(s)":
-                    cmd_string = "cmedit get " + ne_name + " NetworkElement,*"
-                else:
-                    cmd_string = "cmedit get " + ne_name + "* NetworkElement"
-            elif fdn == "SubNetwork":
-                cmd_string = "cmedit get * SubNetwork,SubNetwork"
+                ne_name = fdn.split('NetworkElement=')[-1]
             else:
+                ne_name = "*"
+            if ne_name == "":
+                ne_name = "*"
+            # check direct FDN
+            response = terminal.execute("cmedit get " + fdn)
+            # prepare cmd
+            if response.get_output()[-1] == "1 instance(s)":
+                mo_type = fdn.split(',')[-1].split('=')[0]
                 mo_name = fdn.split(',')[-1].split('=')[-1]
-                cmd_string = "cmedit get * SubNetwork.SubNetworkId==" + mo_name + ",*"
-            response = terminal.execute(cmd_string)
+                cmd = "cmedit get " + ne_name + " " + mo_type + "." + mo_type + "Id==" + mo_name + ",*"
+            elif "," in fdn:
+                parent_mo_type = fdn.split(',')[-2].split('=')[0]
+                cmd = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
+            if fdn == "SubNetwork":
+                cmd = "cmedit get * SubNetwork"
+            if fdn.split(",")[-1].startswith("SubNetwork="):
+                mo_name = fdn.split('SubNetwork=')[-1]
+                cmd = "cmedit get * SubNetwork.SubNetworkId==" + mo_name + ",*"
+            # get fdn list
+            fdn_list = []
+            response = terminal.execute(cmd)
             for line in response.get_output():
                 if line.startswith("FDN : "):
-                    if fdn != line.split(" ")[2]:
+                    line_fdn = line.split("FDN : ")[-1]
+                    if fdn != line_fdn and line_fdn.find(fdn) == 0:
                         fdn_list.append(line.split(" ")[2])
-            filtered_fdn_list = []
-            for i in fdn_list:
-                if i.find(fdn) == 0:
-                    filtered_fdn_list.append(i)
-            if filtered_fdn_list:
-                fdn_list = filtered_fdn_list
             return fdn_list
         except Exception as e:
             print("get_fdn_childs_list", e)
