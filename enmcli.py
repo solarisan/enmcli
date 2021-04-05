@@ -473,7 +473,9 @@ Extended help command:'''
                 mo_type = fdn.split(',')[-1].split('=')[0]
                 mo_name = fdn.split(',')[-1].split('=')[-1]
                 cmd = "cmedit get " + ne_name + " " + mo_type + "." + mo_type + "Id==" + mo_name + ",*"
-            elif "," in fdn:
+            elif fdn.split(',')[-1].find("MeContext=") == 0:
+                cmd = "cmedit get * SubNetwork,*"
+            elif "," in fdn.split('=')[-1]:
                 parent_mo_type = fdn.split(',')[-2].split('=')[0]
                 cmd = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
             else:
