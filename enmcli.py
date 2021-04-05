@@ -468,10 +468,10 @@ Extended help command:'''
             if ne_name == "":
                 ne_name = "*"
             # check direct FDN
-            response = terminal.execute("cmedit get " + fdn)
+            mo_name = fdn.split(',')[-1].split('=')[-1]
+            response = terminal.execute("cmedit get " + fdn + " -attr " + mo_name + "Id -l")
             if response.get_output()[-1] == "1 instance(s)":
                 mo_type = fdn.split(',')[-1].split('=')[0]
-                mo_name = fdn.split(',')[-1].split('=')[-1]
                 cmd = "cmedit get " + ne_name + " " + mo_type + "." + mo_type + "Id==" + mo_name + ",*"
             elif fdn.split(',')[-1].find("MeContext=") == 0:
                 cmd = "cmedit get * SubNetwork,*"
@@ -480,7 +480,6 @@ Extended help command:'''
                 cmd = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
             else:
                 mo_type = fdn.split(',')[-1].split('=')[0]
-                mo_name = fdn.split(',')[-1].split('=')[-1]
                 cmd = "cmedit get " + ne_name + " " + mo_type
             # get fdn list
             fdn_list = []
