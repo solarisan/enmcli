@@ -40,8 +40,14 @@ For more info about cli command use web-help, TAB or "manual "!
 For question about cli.py contact or innightwolfsleep@yandex.ru
 Extended help command:'''
     _cli_completer_text = "123456789"
-    _completer_line_list = []
-    _completer_list = []
+    _completer_line_list = ['help@simple help message (also "h").',
+                            'manual@manual for command. "manual" will print list of avariable manual page',
+                            'quit@if you want to rest (also "q")',
+                            'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
+                            'l+@start logging, use as  "l+" or "l+ logfile.txt"',
+                            'l-@stop logging',
+                            'get@improved alias for "cmedit get FDN", use "get <TAB>" for navigate topology']
+    __last_completer_list = []
     enm_session = None
     cli_input_string = 'CLI> '
     conveyor_to_cli_prefix = 'cli>'
@@ -69,7 +75,7 @@ Extended help command:'''
         self.unsafe_log_dir = cli_dir + self.unsafe_log_dir
         self.safe_log_dir = cli_dir + self.safe_log_dir
         self.completer_file_name = cli_dir + self.completer_file_name
-        self._completer_line_list = self._get_cli_completer_array()
+        self._completer_line_list = self._extend_cli_completer_list(self._completer_line_list)
 
     def start(self, sys_args, unprotected_mode=False):
         """
@@ -153,6 +159,9 @@ Extended help command:'''
         # this is a loop if cmd_string not "quit"
         while cmd_string not in ['q', 'q ', 'quit', 'quit ']:
             response_text = ''
+            cmd_string = cmd_string.lstrip()
+            if cmd_string.startswith('get '):
+                cmd_string = "cmedit " + cmd_string
             # parse and execute cmd_string
             if cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
@@ -327,7 +336,7 @@ Extended help command:'''
                     log_file.write(
                         '\n' + time.strftime('%Y%m%d_%H%M%S') + ';' + username + ';' + return_value + ';' + cmd_string)
                 try:
-                    os.chmod(log_filename, 0666)
+                    os.chmod(log_filename, 0o0666)
                 except Exception as e:
                     print(e)
                     return True
@@ -389,76 +398,75 @@ Extended help command:'''
             word_n = len(text.split(' '))
             cmedit_get_flag = False
             if state == 0 and text != self._cli_completer_text:
-                if text.startswith("cmedit get "):
+                if text.startswith("get "):
                     cmedit_get_flag = True
-                    fdn = text[11:]
-                    new_completer_list = map(lambda x: "cmedit get " + x, self.get_fdn_childs_list(fdn))
+                    fdn = text[4:]
+                    new_completer_list = map(lambda x: "get " + x, self.get_fdn_child_list(fdn))
                     if new_completer_list:
-                        self._completer_list = new_completer_list
+                        self.__last_completer_list = new_completer_list
                     else:
-                        for i in self._completer_list:
+                        for i in self.__last_completer_list:
                             if i.find(text) == 0:
                                 new_completer_list.append(i)
                         if new_completer_list:
-                            self._completer_list = new_completer_list
+                            self.__last_completer_list = new_completer_list
                 elif word_n == 0:
-                    self._completer_list = []
+                    self.__last_completer_list = []
                     for line in self._completer_line_list:
                         if len(line.split('@')[0].split(' ')) == 1:
-                            self._completer_list.append(line)
+                            self.__last_completer_list.append(line)
                 elif word_n > 0:
-                    self._completer_list = []
+                    self.__last_completer_list = []
                     for line in self._completer_line_list:
                         if len(line.split('@')[0].split(' ')) == word_n \
                                 and line.startswith(text) \
                                 and not line.startswith('@'):
-                            self._completer_list.append(line)
+                            self.__last_completer_list.append(line)
                 self._cli_completer_text = text
-            out_line = self._completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
-                                                                      len(self._completer_list[state].split('@')[0])))
+            out_line = self.__last_completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
+                                                                 len(self.__last_completer_list[state].split('@')[0])))
             out_line = out_line.replace('\n', '').replace('\r', '')
             out_line = ' ' * len(self.cli_input_string) + out_line
-            sys.stdout.write('\n' + out_line)
+            sys.stdout.write('\n' + str(out_line))
             sys.stdout.flush()
-            if state == len(self._completer_list) - 1:
+            if state == len(self.__last_completer_list) - 1:
                 sys.stdout.write('\n' + self.cli_input_string + readline.get_line_buffer(), )
                 sys.stdout.flush()
             if cmedit_get_flag:
-                return self._completer_list[state].split('@')[0].replace('\n', '')
+                return self.__last_completer_list[state].split('@')[0].replace('\n', '')
             else:
-                return self._completer_list[state].split('@')[0].replace('\n', '') + ' '
+                return self.__last_completer_list[state].split('@')[0].replace('\n', '') + ' '
         except Exception:
             return None
 
-    def _get_cli_completer_array(self):
+    def _extend_cli_completer_list(self, old_list=None):
         """
         support method, get completer_array
         :return:
         """
         try:
+            new_list = []
+            if type(old_list) is not list:
+                old_list = []
             if os.path.exists(self.completer_file_name):
-                completer_array = []
-                with open(self.completer_file_name, 'r') as completer_file:
-                    for line in completer_file:
-                        completer_array.append(line)
-                return completer_array
-            else:
-                return [None]
+                with open(self.completer_file_name, 'r') as f:
+                    old_list.extend(f.readlines())
+            for x in old_list:
+                if x.replace('\n', '').replace('\r', '') not in new_list:
+                    new_list.append(x.replace('\n', '').replace('\r', ''))
+            return new_list
         except Exception as e:
             print(e)
             return [None]
 
-    def get_fdn_childs_list(self, fdn):
+    def get_fdn_child_list(self, fdn):
         """
         """
         try:
-            fdn = fdn[:-1] + fdn[-1:].replace(",","")
+            fdn = fdn[:-1] + fdn[-1:].replace(",", "")
             terminal = self.enm_session.terminal()
             if len(fdn) < 1 or "SubNetwor".startswith(fdn):
                 return ["SubNetwork"]
-            # get SubNetwork list
-            if fdn.split(",")[-1].startswith("SubNetwork"):
-                cmd = "cmedit get * SubNetwork"
             # prepare ne_name
             ne_name = "*"
             if fdn.find("MeContext=") > -1:
@@ -488,16 +496,16 @@ Extended help command:'''
                 if line.startswith("FDN : "):
                     line_fdn = line.split("FDN : ")[-1]
                     if fdn != line_fdn and line_fdn.find(fdn) == 0:
-                        if not "," in line_fdn[len(fdn) + 1:]:
+                        if not ("," in line_fdn[len(fdn) + 1:]):
                             fdn_list.append(line_fdn)
             if fdn_list:
                 fdn_list = list(set(fdn_list))
                 fdn_list.sort()
                 return fdn_list
         except Exception as e:
-            print("get_fdn_childs_list", e)
+            print("get_fdn_child_list", e)
             return None
-            
+
     def print_extend_manual(self, question):
         """
         This method print extended manual page from extend_manual_file_name
