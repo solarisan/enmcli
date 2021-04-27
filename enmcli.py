@@ -599,15 +599,26 @@ Extended help command:'''
     def jsonParsingToText(self, jsonObj, tabs, praserTabs="\t", delimeter=" : "):
         parsedText=""
         if isinstance(jsonObj,dict):
-            for i in jsonObj:
-                if isinstance(jsonObj[i],dict) :
-                    parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
-                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
-                elif isinstance(jsonObj[i],list) :
-                    parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
-                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
+            if "key" in jsonObj and "value" in jsonObj:
+                if isinstance(jsonObj["value"],dict) :
+                    parsedText = parsedText + "\n" + praserTabs*tabs+jsonObj["key"]+delimeter
+                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj["value"],tabs+1,praserTabs)
+                elif isinstance(jsonObj["value"],list) :
+                    parsedText = parsedText + "\n" + praserTabs*tabs+jsonObj["key"]+delimeter
+                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj["value"],tabs+1,praserTabs)
                 else:
-                    parsedText = parsedText + "\n" + str(praserTabs*tabs)+ i + delimeter+str(jsonObj[i])
+                    parsedText = parsedText + "\n" + str(praserTabs*tabs) + jsonObj["key"] + delimeter + str(jsonObj["value"])
+            else:
+                for i in jsonObj:
+                    if isinstance(jsonObj[i],dict) :
+                        parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
+                        parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
+                    elif isinstance(jsonObj[i],list) :
+                        parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
+                        parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
+                    else:
+                        if i != "datatype":
+                            parsedText = parsedText + "\n" + str(praserTabs*tabs) + i + delimeter+str(jsonObj[i])
         if isinstance(jsonObj,list):
             for i in jsonObj:
                 if isinstance(i,dict) :
