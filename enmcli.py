@@ -15,6 +15,7 @@ import re
 import subprocess
 import getpass
 import time
+import json
 
 
 class EnmCli(object):
@@ -46,12 +47,13 @@ Extended help command:'''
                             'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
-                            'get@improved alias for "cmedit get FDN", use "get <TAB>" for navigate topology']
+                            'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     enm_session = None
+    topology_browser_prefix = "get "
     cli_input_string = 'CLI> '
     conveyor_to_cli_prefix = 'cli>'
-    conveyor_delimeter = '|'
+    conveyor_delimiter = '|'
     max_conveyor_cmd_ask_user = 30
     cli_history_file_name = '~/.cliHistory'
     user_group_file_name = '/CLI_ENM_UserGroup.csv'
@@ -160,10 +162,11 @@ Extended help command:'''
         while cmd_string not in ['q', 'q ', 'quit', 'quit ']:
             response_text = ''
             cmd_string = cmd_string.lstrip()
-            if cmd_string.startswith('get '):
-                cmd_string = "cmedit " + cmd_string
             # parse and execute cmd_string
-            if cmd_string in ['h', 'h ', 'help', 'help ']:
+            if cmd_string.startswith(self.topology_browser_prefix):
+                responce = self.topology_browser_get_fdn(self.enm_session, cmd_string[len(self.topology_browser_prefix):])
+                print(str(self.jsonParsingToText(responce, 1, "   ")))
+            elif cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
             elif cmd_string.startswith('manual') or cmd_string.startswith('help'):
                 self.print_extend_manual(cmd_string)
@@ -219,10 +222,10 @@ Extended help command:'''
         :param cmd_string:
         :return response_text
         """
-        response_text = self.enm_execute(cmd_string.split(self.conveyor_delimeter)[0])
-        # if there are conveyor delimeter in cmd_string and first command execution done, start conveyor
-        if len(cmd_string.split(self.conveyor_delimeter)) > 1 and len(response_text) > 0:
-            conveyor_cmd_list = cmd_string.split(self.conveyor_delimeter)[1:]
+        response_text = self.enm_execute(cmd_string.split(self.conveyor_delimiter)[0])
+        # if there are conveyor delimiter in cmd_string and first command execution done, start conveyor
+        if len(cmd_string.split(self.conveyor_delimiter)) > 1 and len(response_text) > 0:
+            conveyor_cmd_list = cmd_string.split(self.conveyor_delimiter)[1:]
             for conveyor_cmd in conveyor_cmd_list:
                 if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_prefix):
                     next_cmd_list = response_text.split('\n')
@@ -398,10 +401,10 @@ Extended help command:'''
             word_n = len(text.split(' '))
             cmedit_get_flag = False
             if state == 0 and text != self._cli_completer_text:
-                if text.startswith("get "):
+                if text.startswith(self.topology_browser_prefix):
                     cmedit_get_flag = True
-                    fdn = text[4:]
-                    new_completer_list = map(lambda x: "get " + x, self.get_fdn_child_list(fdn))
+                    fdn = text[len(self.topology_browser_prefix):]
+                    new_completer_list = map(lambda x: self.topology_browser_prefix + x, self.topology_browser_goto_fdn(self.enm_session, fdn))
                     if new_completer_list:
                         self.__last_completer_list = new_completer_list
                     else:
@@ -459,51 +462,54 @@ Extended help command:'''
             print(e)
             return [None]
 
-    def get_fdn_child_list(self, fdn):
-        """
-        """
+    @staticmethod
+    def topology_browser_goto_fdn(enm_session, fdn=""):
         try:
-            fdn = fdn[:-1] + fdn[-1:].replace(",", "")
-            terminal = self.enm_session.terminal()
-            if len(fdn) < 1 or "SubNetwor".startswith(fdn):
-                return ["SubNetwork"]
-            # prepare ne_name
-            ne_name = "*"
-            if fdn.find("MeContext=") > -1:
-                ne_name = fdn.split("MeContext=")[-1].split(",")[0]
-            elif fdn.startswith("NetworkElement="):
-                ne_name = fdn.split('NetworkElement=')[-1]
-            if ne_name == "":
-                ne_name = "*"
-            # check direct FDN
-            mo_name = fdn.split(',')[-1].split('=')[-1]
-            response = terminal.execute("cmedit get " + fdn + " -attr " + mo_name + "Id -l")
-            if response.get_output()[-1] == "1 instance(s)":
-                mo_type = fdn.split(',')[-1].split('=')[0]
-                cmd = "cmedit get " + ne_name + " " + mo_type + "." + mo_type + "Id==" + mo_name + ",*"
-            elif fdn.split(',')[-1].find("MeContext=") == 0:
-                cmd = "cmedit get * SubNetwork,*"
-            elif "," in fdn.split('=')[-1]:
-                parent_mo_type = fdn.split(',')[-2].split('=')[0]
-                cmd = "cmedit get " + ne_name + " " + parent_mo_type + ",*"
+            fdn_temp = fdn
+            mo_list = []
+            terminal = enm_session.terminal()
+            s = terminal._handler._session
+            if fdn_temp == '':
+                resp = s.get(s._url + u"/persistentObject/network/-1?relativeDepth=0:-2")
+                if resp.status_code!=200:
+                    return None
+                mo_raw = json.loads(resp.content)["treeNodes"]
             else:
-                mo_type = fdn.split(',')[-1].split('=')[0]
-                cmd = "cmedit get " + ne_name + " " + mo_type
-            # get fdn list
-            fdn_list = []
-            response = terminal.execute(cmd)
-            for line in response.get_output():
-                if line.startswith("FDN : "):
-                    line_fdn = line.split("FDN : ")[-1]
-                    if fdn != line_fdn and line_fdn.find(fdn) == 0:
-                        if not ("," in line_fdn[len(fdn) + 1:]):
-                            fdn_list.append(line_fdn)
-            if fdn_list:
-                fdn_list = list(set(fdn_list))
-                fdn_list.sort()
-                return fdn_list
+                response = terminal.execute("cmedit get " + fdn_temp)
+                if response.get_output()[-1] != "1 instance(s)":
+                    fdn_temp = ",".join(fdn_temp.split(",")[:-1])
+                    response = terminal.execute("cmedit get " + fdn_temp)
+                if response.get_output()[-1] == "1 instance(s)":
+                    resp = s.get(s._url + u"/persistentObject/fdn/" + str(fdn_temp))
+                    poid = str(json.loads(resp.content)["poId"])
+                    resp = s.get(s._url + u"/persistentObject/network/" + str(poid))
+                    mo_raw = json.loads(resp.content)["treeNodes"][0]["childrens"]
+                    fdn_temp = fdn_temp + ","
+                else: 
+                    return None
+            for i in mo_raw:
+                fdn_new = fdn_temp + i["moType"] + "=" + i["moName"]
+                if fdn_new.startswith(fdn):
+                    mo_list.append(fdn_new)
+            return mo_list
         except Exception as e:
-            print("get_fdn_child_list", e)
+            print("topology_browser_goto_fdn", e)
+            return None
+
+    @staticmethod
+    def topology_browser_get_fdn(enm_session, fdn=""):
+        try:
+            if fdn[-1]==",":
+                fdn = fdn[:-1]
+            mo_list = []
+            terminal = enm_session.terminal()
+            s = terminal._handler._session
+            req = s._url + u"/persistentObject/fdn/" + str(fdn)
+            resp = s.get(req)
+            mo_raw = json.loads(resp.content)
+            return mo_raw
+        except Exception as e:
+            print("topology_browser_get_fdn", e)
             return None
 
     def print_extend_manual(self, question):
@@ -590,6 +596,28 @@ Extended help command:'''
             print(e)
             return None
 
+    def jsonParsingToText(self, jsonObj, tabs, praserTabs="\t", delimeter=" : "):
+        parsedText=""
+        if isinstance(jsonObj,dict):
+            for i in jsonObj:
+                if isinstance(jsonObj[i],dict) :
+                    parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
+                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
+                elif isinstance(jsonObj[i],list) :
+                    parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
+                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
+                else:
+                    parsedText = parsedText + "\n" + str(praserTabs*tabs)+ i + delimeter+str(jsonObj[i])
+        if isinstance(jsonObj,list):
+            for i in jsonObj:
+                if isinstance(i,dict) :
+                    parsedText = parsedText + "\n" + self.jsonParsingToText(i,tabs+1,praserTabs)
+                elif isinstance(i,list) :
+                    parsedText = parsedText + "\n" + self.jsonParsingToText(i,tabs+1,praserTabs)
+                else:
+                    parsedText = parsedText + "\n" + str(praserTabs*tabs)+str(i)    
+        return parsedText.replace("\n\n","\n")
+    
     @staticmethod
     def open_ext_enm_session(enm_address='', login='', password=''):
         """
