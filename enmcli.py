@@ -16,6 +16,8 @@ import subprocess
 import getpass
 import time
 import json
+import requests
+import socket
 
 
 class EnmCli(object):
@@ -40,7 +42,7 @@ Use "cli>" in bash conveyor for send output to next cli command. Example:
 For more info about cli command use web-help, TAB or "manual "! 
 For question about cli.py contact or innightwolfsleep@yandex.ru
 Extended help command:'''
-    _cli_completer_text = "123456789"
+    _cli_completer_text = "_DEFAUL_TEXT_"
     _completer_line_list = ['help@simple help message (also "h").',
                             'manual@manual for command. "manual" will print list of avariable manual page',
                             'quit@if you want to rest (also "q")',
@@ -49,21 +51,26 @@ Extended help command:'''
                             'l-@stop logging',
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
+    # sessions obj
     enm_session = None
-    topology_browser_prefix = "get "
+    rest_session = None
+    rest_url = ""
+    # syntax options and mode
+    unprotected_mode = False
     cli_input_string = 'CLI> '
     conveyor_to_cli_prefix = 'cli>'
     conveyor_delimiter = '|'
+    topology_browser_prefix = "get "
+    completer_space_count_before_text = 20
     max_conveyor_cmd_ask_user = 30
+    # internal files path
     cli_history_file_name = '~/.cliHistory'
     user_group_file_name = '/CLI_ENM_UserGroup.csv'
     restrict_policy_file_name = '/CLI_ENM_UserRestrictPolicy.csv'
-    unprotected_mode = False
     extend_manual_file_name = '/CLI_ENM_help.csv'
     unsafe_log_dir = '/cli_log/'
     safe_log_dir = '/cli_safelog/'
     completer_file_name = '/CLI_ENM_Completer.csv'
-    completer_space_count_before_text = 20
 
     def __init__(self, cli_dir):
         """
@@ -104,6 +111,8 @@ Extended help command:'''
             print(self.invite_help)
             if self.initialize_enm_session() is None:
                 exit()
+            self.rest_url = self.get_enm_url()
+            self.rest_session = self.get_rest_session()
             self._initialize_shell_config()
             self._infinite_cli_loop()
 
@@ -118,7 +127,11 @@ Extended help command:'''
         # prepare sessions and cli options
         new_enm_session = None
         if enm_url == '':
-            new_enm_session = self.open_int_enm_session()
+            try:
+                new_enm_session = enmscripting.open()
+            except Exception as e:
+                print("cant open internal enm session", e)
+                new_enm_session = None
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             if enm_url == '':
                 enm_url = raw_input('ENM URL: ')
@@ -164,8 +177,9 @@ Extended help command:'''
             cmd_string = cmd_string.lstrip()
             # parse and execute cmd_string
             if cmd_string.startswith(self.topology_browser_prefix):
-                responce = self.topology_browser_get_fdn(self.enm_session, cmd_string[len(self.topology_browser_prefix):])
-                print(str(self.jsonParsingToText(responce, 1, "   ")))
+                responce = self.topology_browser_get_data(self.rest_session, self.rest_url,
+                                                          cmd_string[len(self.topology_browser_prefix):])
+                print(str(self.json_parsing(responce, 1, "   ")))
             elif cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
             elif cmd_string.startswith('manual') or cmd_string.startswith('help'):
@@ -404,7 +418,8 @@ Extended help command:'''
                 if text.startswith(self.topology_browser_prefix):
                     cmedit_get_flag = True
                     fdn = text[len(self.topology_browser_prefix):]
-                    new_completer_list = map(lambda x: self.topology_browser_prefix + x, self.topology_browser_goto_fdn(self.enm_session, fdn))
+                    new_completer_list = map(lambda x: self.topology_browser_prefix + x,
+                                             self.topology_browser_get_child(self.rest_session, self.rest_url, fdn))
                     if new_completer_list:
                         self.__last_completer_list = new_completer_list
                     else:
@@ -427,7 +442,8 @@ Extended help command:'''
                             self.__last_completer_list.append(line)
                 self._cli_completer_text = text
             out_line = self.__last_completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
-                                                                 len(self.__last_completer_list[state].split('@')[0])))
+                                                                             len(self.__last_completer_list[
+                                                                                     state].split('@')[0])))
             out_line = out_line.replace('\n', '').replace('\r', '')
             out_line = ' ' * len(self.cli_input_string) + out_line
             sys.stdout.write('\n' + str(out_line))
@@ -463,53 +479,79 @@ Extended help command:'''
             return [None]
 
     @staticmethod
-    def topology_browser_goto_fdn(enm_session, fdn=""):
+    def get_enm_url():
+        with requests.session() as s:
+            ha_url = ''.join(('https://', socket.gethostbyname('haproxy')))
+            redirected_url = s.get(ha_url, verify=False).url
+            parsed_url = redirected_url.split("?goto=")[-1]
+            return str(parsed_url)
+
+    @staticmethod
+    def get_rest_session(url="", login="", password=""):
+        requests.packages.urllib3.disable_warnings()
+        if url == "":
+            s = requests.session()
+            requests.packages.urllib3.disable_warnings()
+            cookie_path = os.path.join(os.path.expanduser("~"), '.enm_login')
+            with open(cookie_path, 'r') as cookie:
+                token = cookie.readline().strip()
+            s.cookies['iPlanetDirectoryPro'] = token
+            return s
+        else:
+            s = requests.session()
+            resp = s.post(ENM_address + '/login?IDToken1=' + login + '&' + 'IDToken2=' + password, verify=False)
+            if resp.status_code == 200:
+                return s
+            else:
+                return None
+
+    @staticmethod
+    def topology_browser_get_child(s, url="", fdn=""):
         try:
             fdn_temp = fdn
             mo_list = []
-            terminal = enm_session.terminal()
-            s = terminal._handler._session
-            if fdn_temp == '':
-                resp = s.get(s._url + u"/persistentObject/network/-1?relativeDepth=0:-2")
-                if resp.status_code!=200:
+            if fdn == '':
+                resp = s.get(url + u"/persistentObject/network/-1?relativeDepth=0:-2", verify=False)
+                if resp.status_code != 200:
                     return None
                 mo_raw = json.loads(resp.content)["treeNodes"]
             else:
-                response = terminal.execute("cmedit get " + fdn_temp)
-                if response.get_output()[-1] != "1 instance(s)":
+                resp = s.get(url + u"/persistentObject/fdn/" + str(fdn_temp), verify=False)
+                if resp.status_code != 200:
                     fdn_temp = ",".join(fdn_temp.split(",")[:-1])
-                    response = terminal.execute("cmedit get " + fdn_temp)
-                if response.get_output()[-1] == "1 instance(s)":
-                    resp = s.get(s._url + u"/persistentObject/fdn/" + str(fdn_temp))
+                    resp = s.get(url + u"/persistentObject/fdn/" + str(fdn_temp), verify=False)
+                if resp.status_code == 200:
+                    resp = s.get(url + u"/persistentObject/fdn/" + str(fdn_temp), verify=False)
                     poid = str(json.loads(resp.content)["poId"])
-                    resp = s.get(s._url + u"/persistentObject/network/" + str(poid))
+                    resp = s.get(url + u"/persistentObject/network/" + str(poid), verify=False)
                     mo_raw = json.loads(resp.content)["treeNodes"][0]["childrens"]
                     fdn_temp = fdn_temp + ","
-                else: 
+                else:
                     return None
             for i in mo_raw:
                 fdn_new = fdn_temp + i["moType"] + "=" + i["moName"]
                 if fdn_new.startswith(fdn):
                     mo_list.append(fdn_new)
+                mo_list.sort()
             return mo_list
         except Exception as e:
-            print("topology_browser_goto_fdn", e)
+            print("topology_browser_get_child", e)
             return None
 
     @staticmethod
-    def topology_browser_get_fdn(enm_session, fdn=""):
+    def topology_browser_get_data(s, url="", fdn=""):
         try:
-            if fdn[-1]==",":
+            if fdn[-1] == ",":
                 fdn = fdn[:-1]
-            mo_list = []
-            terminal = enm_session.terminal()
-            s = terminal._handler._session
-            req = s._url + u"/persistentObject/fdn/" + str(fdn)
-            resp = s.get(req)
-            mo_raw = json.loads(resp.content)
-            return mo_raw
+            resp = s.get(url + u"/persistentObject/fdn/" + str(fdn), verify=False)
+            if resp.status_code == 404:
+                return json.loads(resp.content)
+            elif resp.status_code != 200:
+                return ["Wrong credentionals or session expired!"]
+            else:
+                return json.loads(resp.content)
         except Exception as e:
-            print("topology_browser_get_fdn", e)
+            print("topology_browser_get_data", e)
             return None
 
     def print_extend_manual(self, question):
@@ -583,52 +625,40 @@ Extended help command:'''
                 ss = ss + " "
         return ss
 
-    @staticmethod
-    def open_int_enm_session():
-        """
-        open and return internal ENM session
-        :return:
-        """
-        try:
-            enm_session = enmscripting.open()
-            return enm_session
-        except Exception as e:
-            print(e)
-            return None
-
-    def jsonParsingToText(self, jsonObj, tabs, praserTabs="\t", delimeter=" : "):
-        parsedText=""
-        if isinstance(jsonObj,dict):
-            if "key" in jsonObj and "value" in jsonObj:
-                if isinstance(jsonObj["value"],dict) :
-                    parsedText = parsedText + "\n" + praserTabs*tabs+jsonObj["key"]+delimeter
-                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj["value"],tabs+1,praserTabs)
-                elif isinstance(jsonObj["value"],list) :
-                    parsedText = parsedText + "\n" + praserTabs*tabs+jsonObj["key"]+delimeter
-                    parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj["value"],tabs+1,praserTabs)
+    def json_parsing(self, json_obj, lvl, w_space=" ", delim=" : "):
+        txt = ""
+        if isinstance(json_obj, dict):
+            if "key" in json_obj and "value" in json_obj:
+                if isinstance(json_obj["value"], dict):
+                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delim
+                    txt = txt + "\n" + self.json_parsing(json_obj["value"], lvl + 1, w_space)
+                elif isinstance(json_obj["value"], list):
+                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delim
+                    txt = txt + "\n" + self.json_parsing(json_obj["value"], lvl + 1, w_space)
                 else:
-                    parsedText = parsedText + "\n" + str(praserTabs*tabs) + jsonObj["key"] + delimeter + str(jsonObj["value"])
+                    txt = txt + "\n" + str(w_space * lvl) + json_obj["key"] + delim + str(
+                        json_obj["value"])
             else:
-                for i in jsonObj:
-                    if isinstance(jsonObj[i],dict) :
-                        parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
-                        parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
-                    elif isinstance(jsonObj[i],list) :
-                        parsedText = parsedText + "\n" + praserTabs*tabs+i+delimeter
-                        parsedText = parsedText + "\n" + self.jsonParsingToText(jsonObj[i],tabs+1,praserTabs)
+                for i in json_obj:
+                    if isinstance(json_obj[i], dict):
+                        txt = txt + "\n" + w_space * lvl + i + delim
+                        txt = txt + "\n" + self.json_parsing(json_obj[i], lvl + 1, w_space)
+                    elif isinstance(json_obj[i], list):
+                        txt = txt + "\n" + w_space * lvl + i + delim
+                        txt = txt + "\n" + self.json_parsing(json_obj[i], lvl + 1, w_space)
                     else:
                         if i != "datatype":
-                            parsedText = parsedText + "\n" + str(praserTabs*tabs) + i + delimeter+str(jsonObj[i])
-        if isinstance(jsonObj,list):
-            for i in jsonObj:
-                if isinstance(i,dict) :
-                    parsedText = parsedText + "\n" + self.jsonParsingToText(i,tabs+1,praserTabs)
-                elif isinstance(i,list) :
-                    parsedText = parsedText + "\n" + self.jsonParsingToText(i,tabs+1,praserTabs)
+                            txt = txt + "\n" + str(w_space * lvl) + i + delim + str(json_obj[i])
+        if isinstance(json_obj, list):
+            for i in json_obj:
+                if isinstance(i, dict):
+                    txt = txt + "\n" + self.json_parsing(i, lvl + 1, w_space)
+                elif isinstance(i, list):
+                    txt = txt + "\n" + self.json_parsing(i, lvl + 1, w_space)
                 else:
-                    parsedText = parsedText + "\n" + str(praserTabs*tabs)+str(i)    
-        return parsedText.replace("\n\n","\n")
-    
+                    txt = txt + "\n" + str(w_space * lvl) + str(i)
+        return txt.replace("\n\n", "\n")
+
     @staticmethod
     def open_ext_enm_session(enm_address='', login='', password=''):
         """
