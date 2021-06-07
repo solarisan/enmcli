@@ -52,9 +52,12 @@ Extended help command:'''
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
+    running_on_enm = None
     enm_session = None
     rest_session = None
-    rest_url = ""
+    url = None
+    login = None
+    password = None
     # syntax options and mode
     unprotected_mode = False
     cli_input_string = 'CLI> '
@@ -90,12 +93,13 @@ Extended help command:'''
         """
         This method for beginning to starts CLI shell - parse input args and go to initialize_shell
         :param sys_args:
-        :param unprotected_mode:
+        :param unprotected_mode: use or not use command restricting file?
         :return:
         """
         self.unprotected_mode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if len(sys_args) > 1:
+            # if args1 is '-c' then run cmd file arg2
             if sys_args[1] == '-c' and len(sys_args) > 2:
                 cmd_file_name = sys_args[2]
                 if len(sys_args) > 3:
@@ -103,43 +107,47 @@ Extended help command:'''
                 else:
                     out_file_name = ''
                 self.execute_cmd_file(cmd_file_name, out_file_name)
+            # if only 1 args - run it as single cmd
             else:
                 if self.initialize_enm_session() is None:
                     exit()
                 self._infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
+        # if no args - running cli shell
         else:
             print(self.invite_help)
             if self.initialize_enm_session() is None:
                 exit()
-            self.rest_url = self.get_enm_url()
-            self.rest_session = self.get_rest_session()
+            if self.url is None:
+                self.url = self.get_enm_url()
+            self.rest_session = self.get_rest_session(url=self.url, login=self.url, password=self.password)
             self._initialize_shell_config()
             self._infinite_cli_loop()
 
-    def initialize_enm_session(self, enm_url='', enm_login='', enm_password=''):
+    def initialize_enm_session(self):
         """
         This method starts and return enm session. Overwrite self.enm_session if exist
-        :param enm_url:
-        :param enm_login:
-        :param enm_password:
-        :return:
+        :return: enm session
         """
         # prepare sessions and cli options
-        new_enm_session = None
-        if enm_url == '':
-            try:
-                new_enm_session = enmscripting.open()
-            except Exception as e:
-                print("cant open internal enm session", e)
-                new_enm_session = None
+        try:
+            new_enm_session = enmscripting.open()
+            self.running_on_enm = True
+        except Exception as e:
+            print("cant open internal enm session", e)
+            new_enm_session = None
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
-            if enm_url == '':
-                enm_url = raw_input('ENM URL: ')
-            if enm_login == '':
-                enm_login = raw_input('ENM login: ')
-            if enm_password == '':
-                enm_password = getpass.getpass('ENM password: ')
-            new_enm_session = self.open_ext_enm_session(enm_url, enm_login, enm_password)
+            if self.url:
+                self.url = raw_input('ENM URL: ')
+            if self.login:
+                self.login = raw_input('ENM login: ')
+            if self.password:
+                self.password = getpass.getpass('ENM password: ')
+            try:
+                new_enm_session = self.open_ext_enm_session(self.url, self.login, self.password)
+            except Exception as e:
+                print("cant open external enm session", e)
+                new_enm_session = None
+            self.running_on_enm = False
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             print('Cant open any ENM session!')
             return None
@@ -177,7 +185,7 @@ Extended help command:'''
             cmd_string = cmd_string.lstrip()
             # parse and execute cmd_string
             if cmd_string.startswith(self.topology_browser_prefix):
-                responce = self.topology_browser_get_data(self.rest_session, self.rest_url,
+                responce = self.topology_browser_get_data(self.rest_session, self.url,
                                                           cmd_string[len(self.topology_browser_prefix):])
                 print(str(self.json_parsing(responce, 1, "   ")))
             elif cmd_string in ['h', 'h ', 'help', 'help ']:
@@ -329,7 +337,7 @@ Extended help command:'''
                                              re.IGNORECASE) is not None:
                                     return_value = line.split(';')[1].replace('USERNAME', username)
                 else:
-                    return_value = 'cant find PolicyFile'
+                    return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
             except Exception as e:
                 print(e)
                 return_value = \
@@ -355,7 +363,6 @@ Extended help command:'''
                 try:
                     os.chmod(log_filename, 0o0666)
                 except Exception as e:
-                    print(e)
                     return True
                 return True
         except Exception as e:
@@ -363,19 +370,16 @@ Extended help command:'''
             print("Cant write log to " + self.unsafe_log_dir)
         return False
 
-    def execute_cmd_file(self, cmd_file_name, out_file_name='', enm_url='', enm_login='', enm_password=''):
+    def execute_cmd_file(self, cmd_file_name, out_file_name=''):
         """
         This method using to read command file and send command to enm terminal.
         Commands need to pass enm_execute permission check!
         :param cmd_file_name:
         :param out_file_name:
-        :param enm_url:
-        :param enm_login:
-        :param enm_password:
         :return:
         """
         # prepare sessions and cli options
-        self.initialize_enm_session(enm_url=enm_url, enm_login=enm_login, enm_password=enm_password)
+        self.initialize_enm_session()
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
             lines = file_in.readlines()
         file_out = None
@@ -419,7 +423,7 @@ Extended help command:'''
                     cmedit_get_flag = True
                     fdn = text[len(self.topology_browser_prefix):]
                     new_completer_list = map(lambda x: self.topology_browser_prefix + x,
-                                             self.topology_browser_get_child(self.rest_session, self.rest_url, fdn))
+                                             self.topology_browser_get_child(self.rest_session, self.url, fdn))
                     if new_completer_list:
                         self.__last_completer_list = new_completer_list
                     else:
@@ -487,9 +491,9 @@ Extended help command:'''
             return str(parsed_url)
 
     @staticmethod
-    def get_rest_session(url="", login="", password=""):
+    def get_rest_session(url=None, login=None, password=None):
         requests.packages.urllib3.disable_warnings()
-        if url == "":
+        if url is None or login is None or password is None:
             s = requests.session()
             requests.packages.urllib3.disable_warnings()
             cookie_path = os.path.join(os.path.expanduser("~"), '.enm_login')
@@ -499,7 +503,7 @@ Extended help command:'''
             return s
         else:
             s = requests.session()
-            resp = s.post(ENM_address + '/login?IDToken1=' + login + '&' + 'IDToken2=' + password, verify=False)
+            resp = s.post(url + '/login?IDToken1=' + login + '&' + 'IDToken2=' + password, verify=False)
             if resp.status_code == 200:
                 return s
             else:
