@@ -9,6 +9,7 @@ Simple way to start using - copy enmcli/ to you $HOME directory on ENM scripting
 ____________________________________________________
 
 - cli_start.py - contain start shell code.
+  python cli_start.py
 
 - cli_save_log.py - aditional utility, will move user logs from unsafe log dirrectory to safe directory. May be croned for each minute.
 
