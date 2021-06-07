@@ -52,7 +52,6 @@ Extended help command:'''
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
-    running_on_enm = None
     enm_session = None
     rest_session = None
     url = None
@@ -111,6 +110,9 @@ Extended help command:'''
             else:
                 if self.initialize_enm_session() is None:
                     exit()
+                if self.url is None:
+                    self.url = self.get_enm_url()
+                self.rest_session = self.get_rest_session(url=self.url, login=self.url, password=self.password)
                 self._infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
         # if no args - running cli shell
         else:
@@ -131,23 +133,21 @@ Extended help command:'''
         # prepare sessions and cli options
         try:
             new_enm_session = enmscripting.open()
-            self.running_on_enm = True
         except Exception as e:
             print("cant open internal enm session", e)
             new_enm_session = None
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
-            if self.url:
+            if self.url is None:
                 self.url = raw_input('ENM URL: ')
-            if self.login:
+            if self.login is None:
                 self.login = raw_input('ENM login: ')
-            if self.password:
+            if self.password is None:
                 self.password = getpass.getpass('ENM password: ')
             try:
                 new_enm_session = self.open_ext_enm_session(self.url, self.login, self.password)
             except Exception as e:
                 print("cant open external enm session", e)
                 new_enm_session = None
-            self.running_on_enm = False
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             print('Cant open any ENM session!')
             return None
