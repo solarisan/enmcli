@@ -10,14 +10,17 @@ It defines classes_and_methods
 import enmscripting
 import sys
 import os
-import readline
-import re
 import subprocess
 import getpass
 import time
 import json
 import requests
 import socket
+import re
+try:
+    import readline
+except ImportError:
+    import ptpython as readline
 
 
 class EnmCli(object):
@@ -162,7 +165,7 @@ Extended help command:'''
         readline.parse_and_bind('tab: complete')
         readline.set_completer_delims('')
         readline.set_completer(self._cli_completer)
-        readline.set_completion_display_matches_hook(self._completion_display_matches)
+        # readline.set_completion_display_matches_hook(self._completion_display_matches)
         if not os.path.exists(self.cli_history_file_name):
             cli_history_file = open(self.cli_history_file_name, 'w')
             cli_history_file.close()
@@ -280,8 +283,9 @@ Extended help command:'''
         response = None
         try:
             if len(cmd_string) > 0:
-                cmd_permission = self._check_cmd_permission(cmd_string, os.getlogin())
-                self._add_cmd_to_log(cmd_string, os.getlogin(), cmd_permission)
+                user_login = os.getlogin() if self.login is None else self.login
+                cmd_permission = self._check_cmd_permission(cmd_string, user_login)
+                self._add_cmd_to_log(cmd_string, user_login, cmd_permission)
                 if cmd_permission == 'permit':
                     if cmd_string.find('file:') > -1:
                         file_to_upload = cmd_string[cmd_string.find('file:') + 5:].split(' ')[0]
