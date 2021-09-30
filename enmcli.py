@@ -257,7 +257,7 @@ Extended help command:'''
         if len(cmd_string.split(self.conveyor_delimiter)) > 1 and len(response_text) > 0:
             conveyor_cmd_list = cmd_string.split(self.conveyor_delimiter)[1:]
             for conveyor_cmd in conveyor_cmd_list:
-                if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_prefix):
+                if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_cmd):
                     next_cmd_list = response_text.split('\n')
                     response_text = ''
                     cmd_length_ok = 'y'
