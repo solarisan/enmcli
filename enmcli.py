@@ -10,13 +10,13 @@ It defines classes_and_methods
 import enmscripting
 import sys
 import os
-import subprocess
-import getpass
 import time
-import json
-import requests
-import socket
-import re
+from requests import session, packages
+from subprocess import Popen, PIPE
+from getpass import getpass
+from json import loads as j_loads
+from socket import gethostbyname
+from re import search,IGNORECASE
 try:
     import readline
 except ImportError:
@@ -52,29 +52,30 @@ Extended help command:'''
                             'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
+                            'ping@make NetworkElement by name',
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
-    enm_session = None
-    rest_session = None
-    url = None
+    enm_session = None #session from enmscripting module
+    rest_session = None #simple http enm session
+    url = None # ENM URL
     login = None
     password = None
     # syntax options and mode
-    unprotected_mode = False
-    cli_input_string = 'CLI> '
-    conveyor_to_cli_prefix = 'cli>'
-    conveyor_delimiter = '|'
-    topology_browser_prefix = "get "
-    completer_space_count_before_text = 20
-    max_conveyor_cmd_ask_user = 30
+    unprotected_mode = False  # on/off use permission restrict policy
+    cli_input_string = 'CLI> '  # input string
+    conveyor_delimiter = '|'  # when u senf cmd with | - string fall into bash-like conveyor
+    conveyor_to_cli_cmd = 'cli>'  # when to_cli_cmd find in conveyor - result send to ENM cli, notbash
+    max_conveyor_cmd_ask_user = 30  # determines, when to stop too long command list
+    topology_browser_prefix = "get "  # special subprogramm - reffwr to ttopology-browser interface
+    completer_space_count_before_text = 20  # TAB completer visual delimeter
     # internal files path
-    cli_history_file_name = '~/.cliHistory'
+    cli_history_file_name = '~/.cliHistory'  # user history file
     user_group_file_name = '/CLI_ENM_UserGroup.csv'
     restrict_policy_file_name = '/CLI_ENM_UserRestrictPolicy.csv'
     extend_manual_file_name = '/CLI_ENM_help.csv'
-    unsafe_log_dir = '/cli_log/'
-    safe_log_dir = '/cli_safelog/'
+    unsafe_log_dir = '/cli_log/'  # more one user history file, usually used for centralized logging
+    safe_log_dir = '/cli_safelog/'  # used in cli_log_copy_to_safe
     completer_file_name = '/CLI_ENM_Completer.csv'
 
     def __init__(self, cli_dir):
@@ -108,6 +109,8 @@ Extended help command:'''
                     out_file_name = sys_args[3]
                 else:
                     out_file_name = ''
+                if self.initialize_enm_session() is None:
+                    exit()
                 self.execute_cmd_file(cmd_file_name, out_file_name)
             # if only 1 args - run it as single cmd
             else:
@@ -145,7 +148,7 @@ Extended help command:'''
             if self.login is None:
                 self.login = raw_input('ENM login: ')
             if self.password is None:
-                self.password = getpass.getpass('ENM password: ')
+                self.password = getpass('ENM password: ')
             try:
                 new_enm_session = self.open_ext_enm_session(self.url, self.login, self.password)
             except Exception as e:
@@ -193,6 +196,8 @@ Extended help command:'''
                 print(str(self.json_parsing(responce, 1, "   ")))
             elif cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
+            elif cmd_string.startswith('ping '):
+                self.ping_ne(cmd_string)
             elif cmd_string.startswith('manual') or cmd_string.startswith('help'):
                 self.print_extend_manual(cmd_string)
             elif cmd_string.startswith('?'):
@@ -278,7 +283,6 @@ Extended help command:'''
         refer to _check_cmd_permission for check permissions
         refer to _add_cmd_to_log for save files to log
         """
-        terminal = self.enm_session.terminal()
         response_text = ''
         response = None
         try:
@@ -298,10 +302,10 @@ Extended help command:'''
                         else:
                             file_up = open(file_to_upload, 'rb')
                             cmd_string = cmd_string.replace(file_to_upload, os.path.basename(file_to_upload))
-                            response = terminal.execute(cmd_string, file_up)
+                            response = self.enm_session.terminal().execute(cmd_string, file_up)
                             response_text = '\n'.join(response.get_output())
                     else:
-                        response = terminal.execute(cmd_string)
+                        response = self.enm_session.terminal().execute(cmd_string)
                         response_text = '\n'.join(response.get_output())
                 else:
                     response_text = '\n Command "' + cmd_string + '" not permitted!\n' + cmd_permission
@@ -337,8 +341,8 @@ Extended help command:'''
                     with open(self.restrict_policy_file_name, 'r') as policy_file:
                         for line in policy_file:
                             if line.split(';')[0] == user_group:
-                                if re.search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
-                                             re.IGNORECASE) is not None:
+                                if search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
+                                             IGNORECASE) is not None:
                                     return_value = line.split(';')[1].replace('USERNAME', username)
                 else:
                     return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
@@ -383,7 +387,6 @@ Extended help command:'''
         :return:
         """
         # prepare sessions and cli options
-        self.initialize_enm_session()
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
             lines = file_in.readlines()
         file_out = None
@@ -488,25 +491,25 @@ Extended help command:'''
 
     @staticmethod
     def get_enm_url():
-        with requests.session() as s:
-            ha_url = ''.join(('https://', socket.gethostbyname('haproxy')))
+        with session() as s:
+            ha_url = ''.join(('https://', gethostbyname('haproxy')))
             redirected_url = s.get(ha_url, verify=False).url
             parsed_url = redirected_url.split("?goto=")[-1]
             return str(parsed_url)
 
     @staticmethod
     def get_rest_session(url=None, login=None, password=None):
-        requests.packages.urllib3.disable_warnings()
+        packages.urllib3.disable_warnings()
         if url is None or login is None or password is None:
-            s = requests.session()
-            requests.packages.urllib3.disable_warnings()
+            s = session()
+            packages.urllib3.disable_warnings()
             cookie_path = os.path.join(os.path.expanduser("~"), '.enm_login')
             with open(cookie_path, 'r') as cookie:
                 token = cookie.readline().strip()
             s.cookies['iPlanetDirectoryPro'] = token
             return s
         else:
-            s = requests.session()
+            s = session()
             resp = s.post(url + '/login?IDToken1=' + login + '&' + 'IDToken2=' + password, verify=False)
             if resp.status_code == 200:
                 return s
@@ -522,7 +525,7 @@ Extended help command:'''
                 resp = s.get(url + u"/persistentObject/network/-1?relativeDepth=0:-2", verify=False)
                 if resp.status_code != 200:
                     return None
-                mo_raw = json.loads(resp.content)["treeNodes"]
+                mo_raw = j_loads(resp.content)["treeNodes"]
             else:
                 resp = s.get(url + u"/persistentObject/fdn/" + str(fdn_temp), verify=False)
                 if resp.status_code != 200:
@@ -530,9 +533,9 @@ Extended help command:'''
                     resp = s.get(url + u"/persistentObject/fdn/" + str(fdn_temp), verify=False)
                 if resp.status_code == 200:
                     resp = s.get(url + u"/persistentObject/fdn/" + str(fdn_temp), verify=False)
-                    poid = str(json.loads(resp.content)["poId"])
+                    poid = str(j_loads(resp.content)["poId"])
                     resp = s.get(url + u"/persistentObject/network/" + str(poid), verify=False)
-                    mo_raw = json.loads(resp.content)["treeNodes"][0]["childrens"]
+                    mo_raw = j_loads(resp.content)["treeNodes"][0]["childrens"]
                     fdn_temp = fdn_temp + ","
                 else:
                     return None
@@ -553,14 +556,38 @@ Extended help command:'''
                 fdn = fdn[:-1]
             resp = s.get(url + u"/persistentObject/fdn/" + str(fdn), verify=False)
             if resp.status_code == 404:
-                return json.loads(resp.content)
+                return j_loads(resp.content)
             elif resp.status_code != 200:
                 return ["Wrong credentionals or session expired!"]
             else:
-                return json.loads(resp.content)
+                return j_loads(resp.content)
         except Exception as e:
             print("topology_browser_get_data", e)
             return None
+
+    def ping_ne(self, cmd):
+        if len(cmd.split(" ")) > 1:
+            ne = cmd.split(" ")[1]
+        else:
+            return "no NE name"
+        ping_args = ["-c", "4"]
+        if len(cmd.split(" ")) > 2:
+            ping_args.extend(cmd.split(" ")[2:])
+        search_cmd = 'cmedit get ' + ne + '* ComConnectivityInformation.ipAddress;' \
+                                          'CppConnectivityInformation.ipAddress;' \
+                                          'BscConnectivityInformation.ipAddress;' \
+                                          'StnConnectivityInformation.ipAddress -t -s'
+        response = self.enm_session.terminal().execute(search_cmd)
+        for s in response.get_output():
+            if s.split("\t")[0] == ne:
+                ip = s.split("\t")[3]
+                cmd = 'ping ' + ip + " " + " ".join(ping_args)
+                try:
+                    process = Popen(cmd, stderr=PIPE, shell=True)
+                    result = process.communicate('')
+                    return result
+                except Exception as e:
+                    return "interrupt"
 
     def print_extend_manual(self, question):
         """
@@ -694,7 +721,6 @@ Extended help command:'''
         :param insert_to_stdin:
         :return:
         """
-        process = subprocess.Popen(command, stdout=subprocess.PIPE,
-                                   stdin=subprocess.PIPE, shell=True)
+        process = Popen(command, stdout=PIPE, stdin=PIPE, shell=True)
         proc_stdout = process.communicate(insert_to_stdin)[0].strip()
         return proc_stdout
