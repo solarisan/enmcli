@@ -16,7 +16,7 @@ from subprocess import Popen, PIPE
 from getpass import getpass
 from json import loads as j_loads
 from socket import gethostbyname
-from re import search,IGNORECASE
+from re import search, IGNORECASE
 try:
     import readline
 except ImportError:
@@ -56,9 +56,9 @@ Extended help command:'''
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
-    enm_session = None #session from enmscripting module
-    rest_session = None #simple http enm session
-    url = None # ENM URL
+    enm_session = None  # session from enmscripting module
+    rest_session = None  # simple http enm session
+    url = None  # ENM URL
     login = None
     password = None
     # syntax options and mode
@@ -118,7 +118,7 @@ Extended help command:'''
                     exit()
                 if self.url is None:
                     self.url = self.get_enm_url()
-                self.rest_session = self.get_rest_session(url=self.url, login=self.url, password=self.password)
+                self.rest_session = self.get_rest_session(url=self.url, login=self.login, password=self.password)
                 self._infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
         # if no args - running cli shell
         else:
@@ -127,7 +127,7 @@ Extended help command:'''
                 exit()
             if self.url is None:
                 self.url = self.get_enm_url()
-            self.rest_session = self.get_rest_session(url=self.url, login=self.url, password=self.password)
+            self.rest_session = self.get_rest_session(url=self.url, login=self.login, password=self.password)
             self._initialize_shell_config()
             self._infinite_cli_loop()
 
@@ -150,7 +150,10 @@ Extended help command:'''
             if self.password is None:
                 self.password = getpass('ENM password: ')
             try:
-                new_enm_session = self.open_ext_enm_session(self.url, self.login, self.password)
+                    s = enmscripting.private.session.ExternalSession(self.url)
+                    new_enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(s)
+                    new_enm_session = new_enm_session.with_credentials(
+                        enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
             except Exception as e:
                 print("cant open external enm session", e)
                 new_enm_session = None
@@ -168,7 +171,8 @@ Extended help command:'''
         readline.parse_and_bind('tab: complete')
         readline.set_completer_delims('')
         readline.set_completer(self._cli_completer)
-        # readline.set_completion_display_matches_hook(self._completion_display_matches)
+        if "set_completion_display_matches_hook" in dir(readline):
+            readline.set_completion_display_matches_hook(self._completion_display_matches)
         if not os.path.exists(self.cli_history_file_name):
             cli_history_file = open(self.cli_history_file_name, 'w')
             cli_history_file.close()
@@ -242,7 +246,11 @@ Extended help command:'''
             if run_single_cmd:
                 break
             # start input for next iteration
-            cmd_string = raw_input(self.cli_input_string)
+            try:
+                cmd_string = raw_input(self.cli_input_string)
+            except KeyboardInterrupt as e:
+                print "\nExit CLI. Bye!"
+                exit()
         return enmscripting.close(self.enm_session)
 
     def _conveyor_cmd_executor(self, cmd_string):
@@ -342,7 +350,7 @@ Extended help command:'''
                         for line in policy_file:
                             if line.split(';')[0] == user_group:
                                 if search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
-                                             IGNORECASE) is not None:
+                                          IGNORECASE) is not None:
                                     return_value = line.split(';')[1].replace('USERNAME', username)
                 else:
                     return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
@@ -693,25 +701,6 @@ Extended help command:'''
                 else:
                     txt = txt + "\n" + str(w_space * lvl) + str(i)
         return txt.replace("\n\n", "\n")
-
-    @staticmethod
-    def open_ext_enm_session(enm_address='', login='', password=''):
-        """
-        open and return external ENM session
-        :param enm_address:
-        :param login:
-        :param password:
-        :return:
-        """
-        try:
-            session = enmscripting.private.session.ExternalSession(enm_address)
-            enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(session)
-            enm_session = enm_session.with_credentials(
-                enmscripting.security.authenticator.UsernameAndPassword(login, password))
-            return enm_session
-        except Exception as e:
-            print(e)
-            return None
 
     @staticmethod
     def subprocess_cmd(command, insert_to_stdin=''):
