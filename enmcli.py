@@ -300,7 +300,7 @@ Extended help command:'''
                 self._add_cmd_to_log(cmd_string, user_login, cmd_permission)
                 if cmd_permission == 'permit':
                     if cmd_string.find('file:') > -1:
-                        file_to_upload = cmd_string[cmd_string.find('file:') + 5:].split(' ')[0]
+                        file_to_upload = cmd_string[cmd_string.find('file:') + 5:].split('\n')[0].split(' ')[0]
                         file_to_upload = file_to_upload.replace('"', '')
                         if cmd_string.find('file:/') > -1:
                             cmd_string = \
