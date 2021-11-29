@@ -52,7 +52,7 @@ Extended help command:'''
                             'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
-                            'ping@make NetworkElement by name',
+                            'ping@make NetworkElement ping by name: "ping MOSCOW_LTE001"',
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
@@ -150,10 +150,10 @@ Extended help command:'''
             if self.password is None:
                 self.password = getpass('ENM password: ')
             try:
-                    s = enmscripting.private.session.ExternalSession(self.url)
-                    new_enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(s)
-                    new_enm_session = new_enm_session.with_credentials(
-                        enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
+                s = enmscripting.private.session.ExternalSession(self.url)
+                new_enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(s)
+                new_enm_session = new_enm_session.with_credentials(
+                    enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
             except Exception as e:
                 print("cant open external enm session", e)
                 new_enm_session = None
@@ -195,9 +195,9 @@ Extended help command:'''
             cmd_string = cmd_string.lstrip()
             # parse and execute cmd_string
             if cmd_string.startswith(self.topology_browser_prefix):
-                responce = self.topology_browser_get_data(self.rest_session, self.url,
+                response = self.topology_browser_get_data(self.rest_session, self.url,
                                                           cmd_string[len(self.topology_browser_prefix):])
-                print(str(self.json_parsing(responce, 1, "   ")))
+                print(str(self.json_parsing(response, 1, "   ")))
             elif cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
             elif cmd_string.startswith('ping '):
@@ -248,9 +248,9 @@ Extended help command:'''
             # start input for next iteration
             try:
                 cmd_string = raw_input(self.cli_input_string)
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 print "\nExit CLI. Bye!"
-                exit()
+                return enmscripting.close(self.enm_session)
         return enmscripting.close(self.enm_session)
 
     def _conveyor_cmd_executor(self, cmd_string):
@@ -379,7 +379,7 @@ Extended help command:'''
                 try:
                     os.chmod(log_filename, 0o0666)
                 except Exception as e:
-                    return True
+                    return e
                 return True
         except Exception as e:
             print(e)
@@ -474,7 +474,7 @@ Extended help command:'''
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '')
             else:
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '') + ' '
-        except Exception:
+        except Exception as e:
             return None
 
     def _extend_cli_completer_list(self, old_list=None):
@@ -595,7 +595,8 @@ Extended help command:'''
                     result = process.communicate('')
                     return result
                 except Exception as e:
-                    return "interrupt"
+                    print(e)
+                    return None
 
     def print_extend_manual(self, question):
         """
@@ -668,36 +669,37 @@ Extended help command:'''
                 ss = ss + " "
         return ss
 
-    def json_parsing(self, json_obj, lvl, w_space=" ", delim=" : "):
+    @staticmethod
+    def json_parsing(json_obj, lvl, w_space=" ", delimeter=" : "):
         txt = ""
         if isinstance(json_obj, dict):
             if "key" in json_obj and "value" in json_obj:
                 if isinstance(json_obj["value"], dict):
-                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delim
-                    txt = txt + "\n" + self.json_parsing(json_obj["value"], lvl + 1, w_space)
+                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimeter
+                    txt = txt + "\n" + EnmCli.json_parsing(json_obj["value"], lvl + 1, w_space)
                 elif isinstance(json_obj["value"], list):
-                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delim
-                    txt = txt + "\n" + self.json_parsing(json_obj["value"], lvl + 1, w_space)
+                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimeter
+                    txt = txt + "\n" + EnmCli.json_parsing(json_obj["value"], lvl + 1, w_space)
                 else:
-                    txt = txt + "\n" + str(w_space * lvl) + json_obj["key"] + delim + str(
+                    txt = txt + "\n" + str(w_space * lvl) + json_obj["key"] + delimeter + str(
                         json_obj["value"])
             else:
                 for i in json_obj:
                     if isinstance(json_obj[i], dict):
-                        txt = txt + "\n" + w_space * lvl + i + delim
-                        txt = txt + "\n" + self.json_parsing(json_obj[i], lvl + 1, w_space)
+                        txt = txt + "\n" + w_space * lvl + i + delimeter
+                        txt = txt + "\n" + EnmCli.json_parsing(json_obj[i], lvl + 1, w_space)
                     elif isinstance(json_obj[i], list):
-                        txt = txt + "\n" + w_space * lvl + i + delim
-                        txt = txt + "\n" + self.json_parsing(json_obj[i], lvl + 1, w_space)
+                        txt = txt + "\n" + w_space * lvl + i + delimeter
+                        txt = txt + "\n" + EnmCli.json_parsing(json_obj[i], lvl + 1, w_space)
                     else:
                         if i != "datatype":
-                            txt = txt + "\n" + str(w_space * lvl) + i + delim + str(json_obj[i])
+                            txt = txt + "\n" + str(w_space * lvl) + i + delimeter + str(json_obj[i])
         if isinstance(json_obj, list):
             for i in json_obj:
                 if isinstance(i, dict):
-                    txt = txt + "\n" + self.json_parsing(i, lvl + 1, w_space)
+                    txt = txt + "\n" + EnmCli.json_parsing(i, lvl + 1, w_space)
                 elif isinstance(i, list):
-                    txt = txt + "\n" + self.json_parsing(i, lvl + 1, w_space)
+                    txt = txt + "\n" + EnmCli.json_parsing(i, lvl + 1, w_space)
                 else:
                     txt = txt + "\n" + str(w_space * lvl) + str(i)
         return txt.replace("\n\n", "\n")
