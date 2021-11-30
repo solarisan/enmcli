@@ -581,10 +581,18 @@ Extended help command:'''
         ping_args = ["-c", "4"]
         if len(cmd.split(" ")) > 2:
             ping_args.extend(cmd.split(" ")[2:])
-        search_cmd = 'cmedit get ' + ne + '* ComConnectivityInformation.ipAddress;' \
-                                          'CppConnectivityInformation.ipAddress;' \
-                                          'BscConnectivityInformation.ipAddress;' \
-                                          'StnConnectivityInformation.ipAddress -t -s'
+        mos = "BscConnectivityInformation;CbpOiConnectivityInformation;ComConnectivityInformation" \
+              ";CppConnectivityInformation;EceeConnectivityInformation;EciConnectivityInformation" \
+              ";EciProxyConnectivityInformation;EosConnectivityInformation;Er6000ConnectivityInformation" \
+              ";EsaConnectivityInformation;EscConnectivityInformation;ExosConnectivityInformation" \
+              ";FrontHaul6000ConnectivityInformation;FrontHaul6080ConnectivityInformation" \
+              ";GenericFmNodeConnectivityInformation;GenericSnmpNodeConnectivityInformation" \
+              ";HdsConnectivityInformation;HlrFeConnectivityInformation;HttpConnectivityInformation" \
+              ";IposOiConnectivityInformation;IsConnectivityInformation;MINILINKIndoorConnectivityInformation" \
+              ";MINILINKOutdoorConnectivityInformation;MscConnectivityInformation;R8800ConnectivityInformation" \
+              ";SSRConnectivityInformation;STNConnectivityInformation;TspConnectivityInformation" \
+              ";VREConnectivityInformation"
+        search_cmd = 'cmedit get ' + ne + '* ' + mos + ' -t -s'
         response = self.enm_session.terminal().execute(search_cmd)
         for s in response.get_output():
             if s.split("\t")[0] == ne:
