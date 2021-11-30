@@ -52,7 +52,7 @@ Extended help command:'''
                             'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
-                            'ping@make NetworkElement ping by name: "ping MOSCOW_LTE001"',
+                            'ping@ping NetworkElement by name: "ping MOSCOW_LTE001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
@@ -581,30 +581,35 @@ Extended help command:'''
         ping_args = ["-c", "4"]
         if len(cmd.split(" ")) > 2:
             ping_args.extend(cmd.split(" ")[2:])
-        mos = "BscConnectivityInformation;CbpOiConnectivityInformation;ComConnectivityInformation" \
-              ";CppConnectivityInformation;EceeConnectivityInformation;EciConnectivityInformation" \
-              ";EciProxyConnectivityInformation;EosConnectivityInformation;Er6000ConnectivityInformation" \
-              ";EsaConnectivityInformation;EscConnectivityInformation;ExosConnectivityInformation" \
-              ";FrontHaul6000ConnectivityInformation;FrontHaul6080ConnectivityInformation" \
-              ";GenericFmNodeConnectivityInformation;GenericSnmpNodeConnectivityInformation" \
-              ";HdsConnectivityInformation;HlrFeConnectivityInformation;HttpConnectivityInformation" \
-              ";IposOiConnectivityInformation;IsConnectivityInformation;MINILINKIndoorConnectivityInformation" \
-              ";MINILINKOutdoorConnectivityInformation;MscConnectivityInformation;R8800ConnectivityInformation" \
-              ";SSRConnectivityInformation;STNConnectivityInformation;TspConnectivityInformation" \
-              ";VREConnectivityInformation"
-        search_cmd = 'cmedit get ' + ne + '* ' + mos + ' -t -s'
+        mos = "BscConnectivityInformation.ipaddress;CbpOiConnectivityInformation.ipaddress;ComConnectivityInformation" \
+              ".ipaddress;CppConnectivityInformation.ipaddress;EceeConnectivityInformation.ipaddress" \
+              ";EciConnectivityInformation.ipaddress;EosConnectivityInformation.ipaddress" \
+              ";Er6000ConnectivityInformation.ipaddress;EsaConnectivityInformation.ipaddress" \
+              ";EscConnectivityInformation.ipaddress;ExosConnectivityInformation.ipaddress" \
+              ";FrontHaul6000ConnectivityInformation.ipaddress;FrontHaul6080ConnectivityInformation.ipaddress" \
+              ";GenericFmNodeConnectivityInformation.ipaddress;GenericSnmpNodeConnectivityInformation.ipaddress" \
+              ";HdsConnectivityInformation.ipaddress;HlrFeConnectivityInformation.ipaddress" \
+              ";HttpConnectivityInformation.ipaddress;IposOiConnectivityInformation.ipaddress" \
+              ";IsConnectivityInformation.ipaddress;MINILINKIndoorConnectivityInformation.ipaddress" \
+              ";MINILINKOutdoorConnectivityInformation.ipaddress;MscConnectivityInformation.ipaddress" \
+              ";R8800ConnectivityInformation.ipaddress;SSRConnectivityInformation.ipaddress" \
+              ";STNConnectivityInformation.ipaddress;TspConnectivityInformation.ipaddress;VREConnectivityInformation" \
+              ".ipaddress "
+        search_cmd = 'cmedit get ' + ne + ' ' + mos + ' -t -s'
         response = self.enm_session.terminal().execute(search_cmd)
+        result = []
         for s in response.get_output():
-            if s.split("\t")[0] == ne:
-                ip = s.split("\t")[3]
-                cmd = 'ping ' + ip + " " + " ".join(ping_args)
-                try:
-                    process = Popen(cmd, stderr=PIPE, shell=True)
-                    result = process.communicate('')
-                    return result
-                except Exception as e:
-                    print(e)
-                    return None
+            if len(s.split("\t")) == 4:
+                node_id, sync_status, connectivity_info, ip_address = s.split("\t")
+                if search(r"\d*\.\d*\.\d*\.\d*", ip_address) is not None:
+                    print(node_id)
+                    try:
+                        cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
+                        process = Popen(cmd, stderr=PIPE, shell=True)
+                        result.append({node_id: process.communicate('')})
+                    except Exception as e:
+                        print(e)
+        return result
 
     def print_extend_manual(self, question):
         """
