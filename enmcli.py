@@ -1,13 +1,17 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-cli - module for using enmscripting terminal cli without web-based cli. Allow to use unix cmd via | statement.
+enmcli - give access to Ericsson Network Manager Command Line Interface (cli)
+from terminal shell on any other system (unix, windows...)
+enmcli have extended ability for logging, restrict policy, linux coveyoring, mo-tree-navigating, pinging, built-in...
+This module use library "enmscripting" - property of Ericsson, so it isn't included here.
+But if you have access to Ericsson Network Manager - obviously, you have access to this library)
 It defines classes_and_methods
 @author:....Ilya Shevchenko
 @contact:    inightwolfsleep@yandex.ru
 """
 
-import enmscripting
+import enmscripting  # enmscripting is a Ericsson property library
 import sys
 import os
 import time
@@ -28,31 +32,31 @@ class EnmCli(object):
     This class spawn CLI session with extended function with logging, history,
     dangerous command options, TAB command completion, help messages.
     """
-    invite_help = '''Type q or quit for exit from cli.
-Type h or help for short help.
-Use TAB for command completion. '''
-    extended_help = '''Type q or quit for exit from cli. 
-Type h or help for short help. 
-Use TAB for command completion.
-For start cli command by one string - "cli <command>" (don't use special shell char).
-For start cli command file from bash - "cli -c <commandFile> <logFile>".
-For start logging type "l+" or "l+ logfile.txt" (default logfile "cli_DATE_TIME.log"). For stop logging type l-.
-For start bash cmd from cli use l, for example "l cat set.xml" )
-Use bash conveyor " | " for start text processing sequence or write to file. Example:
-        cmedit get * networkelement | grep MOSCOW | tee result.txt
-Use "cli>" in bash conveyor for send output to next cli command. Example:
-        cmedit get RNC* utranrelation=CELL* | grep FDN | awk '{print "cmedit get ",$3}' | cli> | grep loadSharing
-For more info about cli command use web-help, TAB or "manual "! 
-For question about cli.py contact or innightwolfsleep@yandex.ru
-Extended help command:'''
-    _cli_completer_text = "_DEFAUL_TEXT_"
+    invite_help = 'Type q or quit for exit from cli.' \
+                  '\nType h or help for short help.' \
+                  '\nUse TAB for command completion. '
+    extended_help = 'Type q or quit for exit from cli.' \
+                    '\nType h or help for short help.' \
+                    '\nUse TAB for command completion.' \
+                    '\nFor start cli command by one string - "cli <command>" (dont use special shell char).' \
+                    '\nFor start cli command file from bash - "cli -c <commandFile> <logFile>".' \
+                    '\nFor start logging type "l+" or "l+ logfile.txt" (default logfile "cli_DATE_TIME.log").' \
+                    '\nFor start bash cmd from cli use l, for example "l cat set.xml" )' \
+                    '\nUse bash conveyor " | " for start text processing sequence or write to file. Example:' \
+                    '\n        cmedit get * NetworkElement | grep MOSCOW | tee result.txt' \
+                    '\nUse \"cli>\" in bash conveyor for send output to next cli command. Example:' \
+                    '\n        cmedit get R* UtranRelation=C* | grep FDN | awk \'{print \"cmedit get \",$3}\' | cli>' \
+                    '\nFor more info about cli command use web-help, TAB or "manual "!' \
+                    '\nFor question about cli.py contact or innightwolfsleep@yandex.ru' \
+                    '\nExtended help command:'
+    _cli_completer_text = "_DEFAULT_TEXT_"
     _completer_line_list = ['help@simple help message (also "h").',
                             'manual@manual for command. "manual" will print list of avariable manual page',
                             'quit@if you want to rest (also "q")',
                             'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
-                            'ping@ping NetworkElement by name: "ping MOSCOW_LTE001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
+                            'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
@@ -195,9 +199,12 @@ Extended help command:'''
             cmd_string = cmd_string.lstrip()
             # parse and execute cmd_string
             if cmd_string.startswith(self.topology_browser_prefix):
-                response = self.topology_browser_get_data(self.rest_session, self.url,
-                                                          cmd_string[len(self.topology_browser_prefix):])
-                print(str(self.json_parsing(response, 1, "   ")))
+                try:
+                    response = self.topology_browser_get_data(self.rest_session, self.url,
+                                                              cmd_string[len(self.topology_browser_prefix):])
+                    print(str(self.json_parsing(response, 1, "   ")))
+                except KeyboardInterrupt:
+                    print("\nInterrupted with Ctrl^C.")
             elif cmd_string in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
             elif cmd_string.startswith('ping '):
@@ -209,6 +216,8 @@ Extended help command:'''
             elif cmd_string.startswith('execute file:'):
                 try:
                     self.execute_cmd_file(cmd_string[13:])
+                except KeyboardInterrupt:
+                    print("\nInterrupted with Ctrl^C.")
                 except Exception as e:
                     print("Error while open file! Check path! Check restrict ' ' symbols!", e)
             elif cmd_string.startswith('l '):
@@ -230,8 +239,14 @@ Extended help command:'''
                 else:
                     print('logfile already unset')
             elif len(cmd_string) > 0:
-                response_text = self._conveyor_cmd_executor(cmd_string)
-                print(self._utf8_chars_to_space(response_text))
+                try:
+                    response_text = self._conveyor_cmd_executor(cmd_string)
+                    print(self._utf8_chars_to_space(response_text))
+                except KeyboardInterrupt:
+                    print("\nInterrupted with Ctrl^C.")
+                except Exception as e:
+                    print(e)
+                    break
             # try to write log&history files
             try:
                 if file_out_name is not None and len(response_text) > 0:
@@ -249,8 +264,8 @@ Extended help command:'''
             try:
                 cmd_string = raw_input(self.cli_input_string)
             except KeyboardInterrupt:
-                print "\nExit CLI. Bye!"
-                return enmscripting.close(self.enm_session)
+                print "\nExit CLI with Ctrl^C. Bye!"
+                break
         return enmscripting.close(self.enm_session)
 
     def _conveyor_cmd_executor(self, cmd_string):
@@ -474,7 +489,7 @@ Extended help command:'''
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '')
             else:
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '') + ' '
-        except Exception as e:
+        except Exception:
             return None
 
     def _extend_cli_completer_list(self, old_list=None):
@@ -574,41 +589,46 @@ Extended help command:'''
             return None
 
     def ping_ne(self, cmd):
-        if len(cmd.split(" ")) > 1:
-            ne = cmd.split(" ")[1]
-        else:
-            return "no NE name"
-        ping_args = ["-c", "4"]
-        if len(cmd.split(" ")) > 2:
-            ping_args.extend(cmd.split(" ")[2:])
-        mos = "BscConnectivityInformation.ipaddress;CbpOiConnectivityInformation.ipaddress;ComConnectivityInformation" \
-              ".ipaddress;CppConnectivityInformation.ipaddress;EceeConnectivityInformation.ipaddress" \
-              ";EciConnectivityInformation.ipaddress;EosConnectivityInformation.ipaddress" \
-              ";Er6000ConnectivityInformation.ipaddress;EsaConnectivityInformation.ipaddress" \
-              ";EscConnectivityInformation.ipaddress;ExosConnectivityInformation.ipaddress" \
-              ";FrontHaul6000ConnectivityInformation.ipaddress;FrontHaul6080ConnectivityInformation.ipaddress" \
-              ";GenericFmNodeConnectivityInformation.ipaddress;GenericSnmpNodeConnectivityInformation.ipaddress" \
-              ";HdsConnectivityInformation.ipaddress;HlrFeConnectivityInformation.ipaddress" \
-              ";HttpConnectivityInformation.ipaddress;IposOiConnectivityInformation.ipaddress" \
-              ";IsConnectivityInformation.ipaddress;MINILINKIndoorConnectivityInformation.ipaddress" \
-              ";MINILINKOutdoorConnectivityInformation.ipaddress;MscConnectivityInformation.ipaddress" \
-              ";R8800ConnectivityInformation.ipaddress;SSRConnectivityInformation.ipaddress" \
-              ";STNConnectivityInformation.ipaddress;TspConnectivityInformation.ipaddress;VREConnectivityInformation" \
-              ".ipaddress "
-        search_cmd = 'cmedit get ' + ne + ' ' + mos + ' -t -s'
-        response = self.enm_session.terminal().execute(search_cmd)
         result = []
-        for s in response.get_output():
-            if len(s.split("\t")) == 4:
-                node_id, sync_status, connectivity_info, ip_address = s.split("\t")
-                if search(r"\d*\.\d*\.\d*\.\d*", ip_address) is not None:
-                    print(node_id)
-                    try:
-                        cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
-                        process = Popen(cmd, stderr=PIPE, shell=True)
-                        result.append({node_id: process.communicate('')})
-                    except Exception as e:
-                        print(e)
+        try:
+            if len(cmd.split(" ")) > 1:
+                ne = cmd.split(" ")[1]
+            else:
+                return "no NE name"
+            ping_args = ["-c", "4"]
+            if len(cmd.split(" ")) > 2:
+                ping_args.extend(cmd.split(" ")[2:])
+            mos = "BscConnectivityInformation.ipaddress;CbpOiConnectivityInformation.ipaddress;" \
+                  "ComConnectivityInformation.ipaddress;" \
+                  "CppConnectivityInformation.ipaddress;EceeConnectivityInformation.ipaddress" \
+                  ";EciConnectivityInformation.ipaddress;EosConnectivityInformation.ipaddress" \
+                  ";Er6000ConnectivityInformation.ipaddress;EsaConnectivityInformation.ipaddress" \
+                  ";EscConnectivityInformation.ipaddress;ExosConnectivityInformation.ipaddress" \
+                  ";FrontHaul6000ConnectivityInformation.ipaddress;FrontHaul6080ConnectivityInformation.ipaddress" \
+                  ";GenericFmNodeConnectivityInformation.ipaddress;GenericSnmpNodeConnectivityInformation.ipaddress" \
+                  ";HdsConnectivityInformation.ipaddress;HlrFeConnectivityInformation.ipaddress" \
+                  ";HttpConnectivityInformation.ipaddress;IposOiConnectivityInformation.ipaddress" \
+                  ";IsConnectivityInformation.ipaddress;MINILINKIndoorConnectivityInformation.ipaddress" \
+                  ";MINILINKOutdoorConnectivityInformation.ipaddress;MscConnectivityInformation.ipaddress" \
+                  ";R8800ConnectivityInformation.ipaddress;SSRConnectivityInformation.ipaddress" \
+                  ";STNConnectivityInformation.ipaddress;TspConnectivityInformation.ipaddress;" \
+                  "VREConnectivityInformation" \
+                  ".ipaddress "
+            search_cmd = 'cmedit get ' + ne + ' ' + mos + ' -t -s'
+            response = self.enm_session.terminal().execute(search_cmd)
+            for s in response.get_output():
+                if len(s.split("\t")) == 4:
+                    node_id, sync_status, connectivity_info, ip_address = s.split("\t")
+                    if search(r"\d*\.\d*\.\d*\.\d*", ip_address) is not None:
+                        print(node_id)
+                        try:
+                            cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
+                            process = Popen(cmd, stderr=PIPE, shell=True)
+                            result.append({node_id: process.communicate('')})
+                        except Exception as e:
+                            print(e)
+        except KeyboardInterrupt:
+            print("ping stopped by user")
         return result
 
     def print_extend_manual(self, question):
