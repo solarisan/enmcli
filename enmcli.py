@@ -3,12 +3,14 @@
 """
 enmcli - give access to Ericsson Network Manager Command Line Interface (cli)
 from terminal shell on any other system (unix, windows...)
-enmcli have extended ability for logging, restrict policy, linux coveyoring, mo-tree-navigating, pinging, built-in...
+enmcli have extended ability for logging, restrict policy, linux conveying, mo-tree-navigating, pinging, built-in...
+Notice:
 This module use library "enmscripting" - property of Ericsson, so it isn't included here.
 But if you have access to Ericsson Network Manager - obviously, you have access to this library)
-It defines classes_and_methods
-@author:....Ilya Shevchenko
-@contact:    inightwolfsleep@yandex.ru
+Just copy enmscripting to enmcli folder.
+Also, if you install enmcli on ENM scripting VM - you will able to use it without additional actions.
+@author:    Ilya Shevchenko
+@contact:   inightwolfsleep@yandex.ru
 """
 
 import enmscripting  # enmscripting is a Ericsson property library
@@ -21,10 +23,7 @@ from getpass import getpass
 from json import loads as j_loads
 from socket import gethostbyname
 from re import search, IGNORECASE
-try:
-    import readline
-except ImportError:
-    import ptpython as readline
+import readline  # use pyreadline on Windows system
 
 
 class EnmCli(object):
@@ -57,6 +56,7 @@ class EnmCli(object):
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
                             'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
+                            'cmcopy@get cmedit create-copy commands',
                             'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
@@ -177,6 +177,9 @@ class EnmCli(object):
         readline.set_completer(self._cli_completer)
         if "set_completion_display_matches_hook" in dir(readline):
             readline.set_completion_display_matches_hook(self._completion_display_matches)
+        else:
+            readline.rl.mode.show_all_if_ambiguous = "off"
+            readline.rl.bell_style = "audible"
         if not os.path.exists(self.cli_history_file_name):
             cli_history_file = open(self.cli_history_file_name, 'w')
             cli_history_file.close()
@@ -429,21 +432,11 @@ class EnmCli(object):
         enmscripting.close(self.enm_session)
 
     def _completion_display_matches(self, substitution, matches_list, longest_match_length):
-        """
-        dummy method for readline, for future use
-        :param substitution:
-        :param matches_list:
-        :param longest_match_length:
-        :return:
-        """
         pass
 
     def _cli_completer(self, text, state):
         """
         command completion method for readline
-        :param text:
-        :param state:
-        :return:
         """
         try:
             word_n = len(text.split(' '))
@@ -490,12 +483,12 @@ class EnmCli(object):
             else:
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '') + ' '
         except Exception:
+            pass
             return None
 
     def _extend_cli_completer_list(self, old_list=None):
         """
         support method, get completer_array
-        :return:
         """
         try:
             new_list = []
@@ -615,7 +608,11 @@ class EnmCli(object):
                   "VREConnectivityInformation" \
                   ".ipaddress "
             search_cmd = 'cmedit get ' + ne + ' ' + mos + ' -t -s'
-            response = self.enm_session.terminal().execute(search_cmd)
+            try:
+                response = self.enm_session.terminal().execute(search_cmd)
+            except Exception as e:
+                print("enm session error! May be session is expired?\n", e)
+                return False
             for s in response.get_output():
                 if len(s.split("\t")) == 4:
                     node_id, sync_status, connectivity_info, ip_address = s.split("\t")
@@ -689,11 +686,6 @@ class EnmCli(object):
 
     @staticmethod
     def _utf8_chars_to_space(string):
-        """
-        encode utf to ASCII, replace undefined to " "
-        :param string:
-        :return:
-        """
         ss = ""
         for i in string:
             if ord(i) < 127:
@@ -703,30 +695,30 @@ class EnmCli(object):
         return ss
 
     @staticmethod
-    def json_parsing(json_obj, lvl, w_space=" ", delimeter=" : "):
+    def json_parsing(json_obj, lvl, w_space=" ", delimiter=" : "):
         txt = ""
         if isinstance(json_obj, dict):
             if "key" in json_obj and "value" in json_obj:
                 if isinstance(json_obj["value"], dict):
-                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimeter
+                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimiter
                     txt = txt + "\n" + EnmCli.json_parsing(json_obj["value"], lvl + 1, w_space)
                 elif isinstance(json_obj["value"], list):
-                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimeter
+                    txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimiter
                     txt = txt + "\n" + EnmCli.json_parsing(json_obj["value"], lvl + 1, w_space)
                 else:
-                    txt = txt + "\n" + str(w_space * lvl) + json_obj["key"] + delimeter + str(
+                    txt = txt + "\n" + str(w_space * lvl) + json_obj["key"] + delimiter + str(
                         json_obj["value"])
             else:
                 for i in json_obj:
                     if isinstance(json_obj[i], dict):
-                        txt = txt + "\n" + w_space * lvl + i + delimeter
+                        txt = txt + "\n" + w_space * lvl + i + delimiter
                         txt = txt + "\n" + EnmCli.json_parsing(json_obj[i], lvl + 1, w_space)
                     elif isinstance(json_obj[i], list):
-                        txt = txt + "\n" + w_space * lvl + i + delimeter
+                        txt = txt + "\n" + w_space * lvl + i + delimiter
                         txt = txt + "\n" + EnmCli.json_parsing(json_obj[i], lvl + 1, w_space)
                     else:
                         if i != "datatype":
-                            txt = txt + "\n" + str(w_space * lvl) + i + delimeter + str(json_obj[i])
+                            txt = txt + "\n" + str(w_space * lvl) + i + delimiter + str(json_obj[i])
         if isinstance(json_obj, list):
             for i in json_obj:
                 if isinstance(i, dict):
@@ -741,9 +733,6 @@ class EnmCli(object):
     def subprocess_cmd(command, insert_to_stdin=''):
         """
         execute shell command and return response
-        :param command:
-        :param insert_to_stdin:
-        :return:
         """
         process = Popen(command, stdout=PIPE, stdin=PIPE, shell=True)
         proc_stdout = process.communicate(insert_to_stdin)[0].strip()
