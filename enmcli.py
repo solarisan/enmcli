@@ -141,8 +141,8 @@ class EnmCli(object):
             if self.url is None:
                 self.url = self.get_internal_enm_url()
             return new_enm_session
-        except Exception as e:
-            print("Cant open internal enm session", e)
+        except Exception as exc:
+            print("Cant open internal enm session", exc)
             return None
 
     def _ask_enm_url_login_password(self, ask_new=False):
@@ -160,8 +160,8 @@ class EnmCli(object):
             new_enm_session = new_enm_session.with_credentials(
                 enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
             return new_enm_session
-        except Exception as e:
-            print("Cant open external enm session", e)
+        except Exception as exc:
+            print("Cant open external enm session", exc)
             return None
 
     def _initialize_shell_config(self):
@@ -216,8 +216,8 @@ class EnmCli(object):
                     self.execute_cmd_file(cmd[13:])
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
-                except Exception as e:
-                    print("Error while open file! Check path! Check restrict ' ' symbols!", e)
+                except Exception as exc:
+                    print("Error while open file! Check path! Check restrict ' ' symbols!", exc)
             elif cmd.startswith('l '):
                 response_text = self.subprocess_cmd(cmd[2:])
                 print(response_text)
@@ -242,20 +242,20 @@ class EnmCli(object):
                     print(self._utf8_chars_to_space(response_text))
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
-                except Exception as e:
-                    print(e)
+                except Exception as exc:
+                    print(exc)
                     break
             # try to write log&history files
             try:
                 if file_out_name is not None and len(response_text) > 0:
                     with open(file_out_name, 'a') as file_out:
                         file_out.write('\n' + self.cli_input_string + cmd + '\n' + response_text)
-            except Exception as e:
-                print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), e)
+            except Exception as exc:
+                print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), exc)
             try:
                 readline.write_history_file(self.cli_history_file_name)
-            except Exception as e:
-                print("Cant write cli history to file: " + self.cli_history_file_name, e)
+            except Exception as exc:
+                print("Cant write cli history to file: " + self.cli_history_file_name, exc)
             if run_single_cmd:
                 break
             # start input for next iteration
@@ -330,8 +330,8 @@ class EnmCli(object):
                         response_text = '\n'.join(response.get_output())
                 else:
                     response_text = '\n Command "' + cmd_string + '" not permitted!\n' + cmd_permission
-        except Exception as e:
-            print(e)
+        except Exception as exc:
+            print(exc)
             response_text = '>>> Wrong command or expired session: ' + cmd_string
         if response is not None:
             if response.has_files():
@@ -367,8 +367,8 @@ class EnmCli(object):
                                     return_value = line.split(';')[1].replace('USERNAME', username)
                 else:
                     return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
-            except Exception as e:
-                print(e)
+            except Exception as exc:
+                print(exc)
                 return_value = \
                     'cli.py script error during check permission!'
         return return_value
@@ -387,11 +387,11 @@ class EnmCli(object):
                         '\n' + time.strftime('%Y%m%d_%H%M%S') + ';' + username + ';' + return_value + ';' + cmd_string)
                 try:
                     os.chmod(log_filename, 0o0666)
-                except Exception as e:
-                    return e
+                except Exception as exc:
+                    return exc
                 return True
-        except Exception as e:
-            print(e)
+        except Exception as exc:
+            print(exc)
             print("Cant write log to " + self.unsafe_log_dir)
         return False
 
@@ -415,8 +415,8 @@ class EnmCli(object):
             try:
                 if file_out is not None:
                     file_out.write('\n' + self.cli_input_string + line + '\n' + response_text)
-            except Exception as e:
-                print(e)
+            except Exception as exc:
+                print(exc)
                 print("Cant write log!!!")
         if file_out is not None:
             file_out.close()
@@ -491,8 +491,8 @@ class EnmCli(object):
                 if x.replace('\n', '').replace('\r', '') not in new_list:
                     new_list.append(x.replace('\n', '').replace('\r', ''))
             return new_list
-        except Exception as e:
-            print(e)
+        except Exception as exc:
+            print(exc)
             return [None]
 
     @staticmethod
@@ -551,8 +551,8 @@ class EnmCli(object):
                     mo_list.append(fdn_new)
                 mo_list.sort()
             return mo_list
-        except Exception as e:
-            print("topology_browser_get_child", e)
+        except Exception as exc:
+            print("topology_browser_get_child", exc)
             return None
 
     @staticmethod
@@ -567,8 +567,8 @@ class EnmCli(object):
                 return ["Wrong credentials or session expired!"]
             else:
                 return j_loads(resp.content)
-        except Exception as e:
-            print("topology_browser_get_data", e)
+        except Exception as exc:
+            print("topology_browser_get_data", exc)
             return None
 
     def ping_ne(self, cmd):
@@ -600,8 +600,8 @@ class EnmCli(object):
             search_cmd = 'cmedit get ' + ne + ' ' + mos + ' -t -s'
             try:
                 response = self.enm_session.terminal().execute(search_cmd)
-            except Exception as e:
-                print("enm session error! May be session is expired?\n", e)
+            except Exception as exc:
+                print("enm session error! May be session is expired?\n", exc)
                 return False
             for s in response.get_output():
                 if len(s.split("\t")) == 4:
@@ -612,8 +612,8 @@ class EnmCli(object):
                             cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
                             process = Popen(cmd, stderr=PIPE, shell=True)
                             result.append({node_id: process.communicate('')})
-                        except Exception as e:
-                            print(e)
+                        except Exception as exc:
+                            print(exc)
         except KeyboardInterrupt:
             print("ping stopped by user")
         return result
@@ -674,8 +674,8 @@ class EnmCli(object):
                                 safelog_file.write(log_file.read())
                                 log_file.truncate(0)
             return True
-        except Exception as e:
-            print(e)
+        except Exception as exc:
+            print(exc)
             return False
 
     @staticmethod
