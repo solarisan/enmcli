@@ -37,7 +37,7 @@ class EnmCli(object):
     extended_help = 'Type q or quit for exit from cli.' \
                     '\nType h or help for short help.' \
                     '\nUse TAB for command completion.' \
-                    '\nFor start cli command by one string - "cli <command>" (dont use special shell char).' \
+                    '\nFor start cli command by one string - "cli <command>".' \
                     '\nFor start cli command file from bash - "cli -c <commandFile> <logFile>".' \
                     '\nFor start logging type "l+" or "l+ logfile.txt" (default logfile "cli_DATE_TIME.log").' \
                     '\nFor start bash cmd from cli use l, for example "l cat set.xml" )' \
@@ -49,15 +49,6 @@ class EnmCli(object):
                     '\nFor question about cli.py contact or innightwolfsleep@yandex.ru' \
                     '\nExtended help command:'
     _cli_completer_text = "_DEFAULT_TEXT_"
-    _completer_line_list = ['help@simple help message (also "h").',
-                            'manual@manual for command. "manual" will print list of avariable manual page',
-                            'quit@if you want to rest (also "q")',
-                            'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
-                            'l+@start logging, use as  "l+" or "l+ logfile.txt"',
-                            'l-@stop logging',
-                            'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
-                            'cmcopy@get cmedit create-copy commands',
-                            'get@topology browser cli, use <TAB> for navigate topology']
     __last_completer_list = []
     # sessions obj
     enm_session = None  # session from enmscripting module
@@ -66,13 +57,12 @@ class EnmCli(object):
     login = None
     password = None
     # syntax options and mode
-    unprotected_mode = False  # on/off use permission restrict policy
+    unprotected_mode = True  # on/off use permission restrict policy
     cli_input_string = 'CLI> '  # input string
-    conveyor_delimiter = '|'  # when u senf cmd with | - string fall into bash-like conveyor
-    conveyor_to_cli_cmd = 'cli>'  # when to_cli_cmd find in conveyor - result send to ENM cli, notbash
+    conveyor_delimiter = '|'  # when u send cmd with | - string fall into bash-like conveyor
+    conveyor_to_cli_cmd = 'cli>'  # when to_cli_cmd find in conveyor - result send to ENM cli, not bash
     max_conveyor_cmd_ask_user = 30  # determines, when to stop too long command list
-    topology_browser_prefix = "get "  # special subprogramm - reffwr to ttopology-browser interface
-    completer_space_count_before_text = 20  # TAB completer visual delimeter
+    completer_lead_space_num = 20  # TAB completer visual delimiter
     # internal files path
     cli_history_file_name = '~/.cliHistory'  # user history file
     user_group_file_name = '/CLI_ENM_UserGroup.csv'
@@ -81,12 +71,22 @@ class EnmCli(object):
     unsafe_log_dir = '/cli_log/'  # more one user history file, usually used for centralized logging
     safe_log_dir = '/cli_safelog/'  # used in cli_log_copy_to_safe
     completer_file_name = '/CLI_ENM_Completer.csv'
+    _completer_line_list = ['help@simple help message (also "h").',
+                            'manual@manual for command. "manual" will print list of available manual page',
+                            'quit@if you want to rest (also "q")',
+                            'l@execute bash cmd from cli, example "l cat set.xml" or "l ls"',
+                            'l+@start logging, use as  "l+" or "l+ logfile.txt"',
+                            'l-@stop logging',
+                            'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
+                            'copy@get cmedit create-copy commands',
+                            'get@topology browser cli, use <TAB> for navigate topology']
 
-    def __init__(self, cli_dir):
+    def __init__(self, cli_dir=""):
         """
-        init code, set folder with all suplimentary files (log dir, restriction files, help files...)
+        initial code, set folder with all supplementary files (log dir, restriction files, help files...)
         :param cli_dir:
         """
+        # init other internal params
         self.cli_history_file_name = os.path.expanduser(self.cli_history_file_name)
         self.user_group_file_name = cli_dir + self.user_group_file_name
         self.restrict_policy_file_name = cli_dir + self.restrict_policy_file_name
@@ -96,7 +96,7 @@ class EnmCli(object):
         self.completer_file_name = cli_dir + self.completer_file_name
         self._completer_line_list = self._extend_cli_completer_list(self._completer_line_list)
 
-    def start(self, sys_args, unprotected_mode=False):
+    def start(self, sys_args, unprotected_mode=True):
         """
         This method for beginning to starts CLI shell - parse input args and go to initialize_shell
         :param sys_args:
@@ -105,6 +105,9 @@ class EnmCli(object):
         """
         self.unprotected_mode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
+        if self.initialize_enm_session() is None:
+            print("Cant start ENM session!")
+            exit()
         if len(sys_args) > 1:
             # if args1 is '-c' then run cmd file arg2
             if sys_args[1] == '-c' and len(sys_args) > 2:
@@ -113,25 +116,13 @@ class EnmCli(object):
                     out_file_name = sys_args[3]
                 else:
                     out_file_name = ''
-                if self.initialize_enm_session() is None:
-                    exit()
                 self.execute_cmd_file(cmd_file_name, out_file_name)
             # if only 1 args - run it as single cmd
             else:
-                if self.initialize_enm_session() is None:
-                    exit()
-                if self.url is None:
-                    self.url = self.get_enm_url()
-                self.rest_session = self.get_rest_session(url=self.url, login=self.login, password=self.password)
-                self._infinite_cli_loop(first_cmd=' '.join(sys_args[1:]), run_single_cmd=True)
+                self._infinite_cli_loop(cmd=' '.join(sys_args[1:]), run_single_cmd=True)
         # if no args - running cli shell
         else:
             print(self.invite_help)
-            if self.initialize_enm_session() is None:
-                exit()
-            if self.url is None:
-                self.url = self.get_enm_url()
-            self.rest_session = self.get_rest_session(url=self.url, login=self.login, password=self.password)
             self._initialize_shell_config()
             self._infinite_cli_loop()
 
@@ -141,31 +132,45 @@ class EnmCli(object):
         :return: enm session
         """
         # prepare sessions and cli options
-        try:
-            new_enm_session = enmscripting.open()
-        except Exception as e:
-            print("cant open internal enm session", e)
-            new_enm_session = None
+        new_enm_session = self._initialize_internal_enm_session()
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
-            if self.url is None:
-                self.url = raw_input('ENM URL: ')
-            if self.login is None:
-                self.login = raw_input('ENM login: ')
-            if self.password is None:
-                self.password = getpass('ENM password: ')
-            try:
-                s = enmscripting.private.session.ExternalSession(self.url)
-                new_enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(s)
-                new_enm_session = new_enm_session.with_credentials(
-                    enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
-            except Exception as e:
-                print("cant open external enm session", e)
-                new_enm_session = None
+            self._ask_enm_url_login_password()
+            new_enm_session = self._initialize_external_enm_session
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             print('Cant open any ENM session!')
             return None
+        self.rest_session = self.get_rest_session(url=self.url, login=self.login, password=self.password)
         self.enm_session = new_enm_session
         return new_enm_session
+
+    def _initialize_internal_enm_session(self):
+        try:
+            new_enm_session = enmscripting.open()
+            if self.url is None:
+                self.url = self.get_internal_enm_url()
+            return new_enm_session
+        except Exception as e:
+            print("Cant open internal enm session", e)
+            return None
+
+    def _ask_enm_url_login_password(self, ask_new=False):
+        if self.url is None or ask_new:
+            self.url = raw_input('ENM URL: ')
+        if self.login is None or ask_new:
+            self.login = raw_input('ENM login: ')
+        if self.password is None or ask_new:
+            self.password = getpass('ENM password: ')
+
+    def _initialize_external_enm_session(self):
+        try:
+            s = enmscripting.private.session.ExternalSession(self.url)
+            new_enm_session = enmscripting.enmsession.UnauthenticatedEnmSession(s)
+            new_enm_session = new_enm_session.with_credentials(
+                enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
+            return new_enm_session
+        except Exception as e:
+            print("Cant open external enm session", e)
+            return None
 
     def _initialize_shell_config(self):
         """
@@ -186,7 +191,7 @@ class EnmCli(object):
         readline.read_history_file(self.cli_history_file_name)
         readline.set_history_length(1000)
 
-    def _infinite_cli_loop(self, first_cmd='', run_single_cmd=False):
+    def _infinite_cli_loop(self, cmd='', run_single_cmd=False):
         """
         This is main shell method. This starts infinite raw_input loop, contain commands parser.
         Refer to _conveyor_cmd_executor running cli commands.
@@ -195,55 +200,53 @@ class EnmCli(object):
         :return: enm_session close status
         """
         file_out_name = None
-        cmd_string = first_cmd
         # this is a loop if cmd_string not "quit"
-        while cmd_string not in ['q', 'q ', 'quit', 'quit ']:
+        while cmd not in ['q', 'q ', 'quit', 'quit ']:
             response_text = ''
-            cmd_string = cmd_string.lstrip()
+            cmd = cmd.lstrip()
             # parse and execute cmd_string
-            if cmd_string.startswith(self.topology_browser_prefix):
+            if cmd.startswith("get "):
                 try:
-                    response = self.topology_browser_get_data(self.rest_session, self.url,
-                                                              cmd_string[len(self.topology_browser_prefix):])
+                    response = self.topology_browser_get_data(self.rest_session, self.url, cmd[len("get "):])
                     print(str(self.json_parsing(response, 1, "   ")))
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
-            elif cmd_string in ['h', 'h ', 'help', 'help ']:
+            elif cmd in ['h', 'h ', 'help', 'help ']:
                 print(self.extended_help)
-            elif cmd_string.startswith('ping '):
-                self.ping_ne(cmd_string)
-            elif cmd_string.startswith('manual') or cmd_string.startswith('help'):
-                self.print_extend_manual(cmd_string)
-            elif cmd_string.startswith('?'):
+            elif cmd.startswith('ping '):
+                self.ping_ne(cmd)
+            elif cmd.startswith('manual') or cmd.startswith('help'):
+                self.print_extend_manual(cmd)
+            elif cmd.startswith('?'):
                 print('Use TAB or "help" or "help <command>" or "manual <command>"!')
-            elif cmd_string.startswith('execute file:'):
+            elif cmd.startswith('execute file:'):
                 try:
-                    self.execute_cmd_file(cmd_string[13:])
+                    self.execute_cmd_file(cmd[13:])
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
                 except Exception as e:
                     print("Error while open file! Check path! Check restrict ' ' symbols!", e)
-            elif cmd_string.startswith('l '):
-                response_text = self.subprocess_cmd(cmd_string[2:])
+            elif cmd.startswith('l '):
+                response_text = self.subprocess_cmd(cmd[2:])
                 print(response_text)
-            elif cmd_string.startswith('l+'):
+            elif cmd.startswith('l+'):
                 if file_out_name is None:
                     file_out_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
-                    if len(cmd_string.split(' ')) > 1:
-                        if len(cmd_string.split(' ')[1]) > 0:
-                            file_out_name = cmd_string.split(' ')[1]
+                    if len(cmd.split(' ')) > 1:
+                        if len(cmd.split(' ')[1]) > 0:
+                            file_out_name = cmd.split(' ')[1]
                     print('set logfile: ' + file_out_name)
                 else:
                     print('logfile already set: ' + file_out_name)
-            elif cmd_string.startswith('l-'):
+            elif cmd.startswith('l-'):
                 if file_out_name is not None:
                     print('logfile unset: ' + file_out_name)
                     file_out_name = None
                 else:
                     print('logfile already unset')
-            elif len(cmd_string) > 0:
+            elif len(cmd) > 0:
                 try:
-                    response_text = self._conveyor_cmd_executor(cmd_string)
+                    response_text = self._conveyor_cmd_executor(cmd)
                     print(self._utf8_chars_to_space(response_text))
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
@@ -254,7 +257,7 @@ class EnmCli(object):
             try:
                 if file_out_name is not None and len(response_text) > 0:
                     with open(file_out_name, 'a') as file_out:
-                        file_out.write('\n' + self.cli_input_string + cmd_string + '\n' + response_text)
+                        file_out.write('\n' + self.cli_input_string + cmd + '\n' + response_text)
             except Exception as e:
                 print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), e)
             try:
@@ -265,7 +268,7 @@ class EnmCli(object):
                 break
             # start input for next iteration
             try:
-                cmd_string = raw_input(self.cli_input_string)
+                cmd = raw_input(self.cli_input_string)
             except KeyboardInterrupt:
                 print "\nExit CLI with Ctrl^C. Bye!"
                 break
@@ -381,10 +384,6 @@ class EnmCli(object):
     def _add_cmd_to_log(self, cmd_string, username, return_value):
         """
         support method, send command to logs
-        :param cmd_string:
-        :param username:
-        :param return_value:
-        :return:
         """
         if not os.path.exists(self.unsafe_log_dir):
             os.mkdir(self.unsafe_log_dir)
@@ -408,9 +407,6 @@ class EnmCli(object):
         """
         This method using to read command file and send command to enm terminal.
         Commands need to pass enm_execute permission check!
-        :param cmd_file_name:
-        :param out_file_name:
-        :return:
         """
         # prepare sessions and cli options
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
@@ -442,10 +438,10 @@ class EnmCli(object):
             word_n = len(text.split(' '))
             cmedit_get_flag = False
             if state == 0 and text != self._cli_completer_text:
-                if text.startswith(self.topology_browser_prefix):
+                if text.startswith("get "):
                     cmedit_get_flag = True
-                    fdn = text[len(self.topology_browser_prefix):]
-                    new_completer_list = map(lambda x: self.topology_browser_prefix + x,
+                    fdn = text[len("get "):]
+                    new_completer_list = map(lambda x: "get " + x,
                                              self.topology_browser_get_child(self.rest_session, self.url, fdn))
                     if new_completer_list:
                         self.__last_completer_list = new_completer_list
@@ -468,7 +464,7 @@ class EnmCli(object):
                                 and not line.startswith('@'):
                             self.__last_completer_list.append(line)
                 self._cli_completer_text = text
-            out_line = self.__last_completer_list[state].replace('@', ' ' * (self.completer_space_count_before_text -
+            out_line = self.__last_completer_list[state].replace('@', ' ' * (self.completer_lead_space_num -
                                                                              len(self.__last_completer_list[
                                                                                      state].split('@')[0])))
             out_line = out_line.replace('\n', '').replace('\r', '')
@@ -482,8 +478,7 @@ class EnmCli(object):
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '')
             else:
                 return self.__last_completer_list[state].split('@')[0].replace('\n', '') + ' '
-        except Exception:
-            pass
+        except IndexError:
             return None
 
     def _extend_cli_completer_list(self, old_list=None):
@@ -506,7 +501,7 @@ class EnmCli(object):
             return [None]
 
     @staticmethod
-    def get_enm_url():
+    def get_internal_enm_url():
         with session() as s:
             ha_url = ''.join(('https://', gethostbyname('haproxy')))
             redirected_url = s.get(ha_url, verify=False).url
@@ -574,7 +569,7 @@ class EnmCli(object):
             if resp.status_code == 404:
                 return j_loads(resp.content)
             elif resp.status_code != 200:
-                return ["Wrong credentionals or session expired!"]
+                return ["Wrong credentials or session expired!"]
             else:
                 return j_loads(resp.content)
         except Exception as e:
