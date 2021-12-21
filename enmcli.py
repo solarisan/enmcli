@@ -57,7 +57,7 @@ class EnmCli(object):
     login = None
     password = None
     # syntax options and mode
-    unprotected_mode = True  # on/off use permission restrict policy
+    unprotected_mode = False  # on/off use permission restrict policy
     cli_input_string = 'CLI> '  # input string
     conveyor_delimiter = '|'  # when u send cmd with | - string fall into bash-like conveyor
     conveyor_to_cli_cmd = 'cli>'  # when to_cli_cmd find in conveyor - result send to ENM cli, not bash
@@ -78,7 +78,6 @@ class EnmCli(object):
                             'l+@start logging, use as  "l+" or "l+ logfile.txt"',
                             'l-@stop logging',
                             'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
-                            'copy@get cmedit create-copy commands',
                             'get@topology browser cli, use <TAB> for navigate topology']
 
     def __init__(self, cli_dir=""):
@@ -96,35 +95,28 @@ class EnmCli(object):
         self.completer_file_name = cli_dir + self.completer_file_name
         self._completer_line_list = self._extend_cli_completer_list(self._completer_line_list)
 
-    def start(self, sys_args, unprotected_mode=True):
+    def start(self, *args):
         """
         This method for beginning to starts CLI shell - parse input args and go to initialize_shell
         :param sys_args:
-        :param unprotected_mode: use or not use command restricting file?
         :return:
         """
-        self.unprotected_mode = unprotected_mode
         # main, refer to infinite cli loop or execute_cmd_file
         if self.initialize_enm_session() is None:
             print("Cant start ENM session!")
             exit()
-        if len(sys_args) > 1:
-            # if args1 is '-c' then run cmd file arg2
-            if sys_args[1] == '-c' and len(sys_args) > 2:
-                cmd_file_name = sys_args[2]
-                if len(sys_args) > 3:
-                    out_file_name = sys_args[3]
-                else:
-                    out_file_name = ''
-                self.execute_cmd_file(cmd_file_name, out_file_name)
-            # if only 1 args - run it as single cmd
-            else:
-                self._infinite_cli_loop(cmd=' '.join(sys_args[1:]), run_single_cmd=True)
-        # if no args - running cli shell
-        else:
+        if len(args) == 1:
             print(self.invite_help)
             self._initialize_shell_config()
             self._infinite_cli_loop()
+        if len(args) == 2:
+            self._infinite_cli_loop(cmd=' '.join(sys_args[1:]), run_single_cmd=True)
+        if len(args) > 2 and args[1] == '-c':
+            cmd_file_name = args[2]
+            out_file_name = ''
+            if len(args) == 4:
+                out_file_name = args[3]
+            self.execute_cmd_file(cmd_file_name, out_file_name)
 
     def initialize_enm_session(self):
         """
@@ -135,7 +127,7 @@ class EnmCli(object):
         new_enm_session = self._initialize_internal_enm_session()
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             self._ask_enm_url_login_password()
-            new_enm_session = self._initialize_external_enm_session
+            new_enm_session = self._initialize_external_enm_session()
         if new_enm_session is None or type(new_enm_session) is enmscripting.enmsession.UnauthenticatedEnmSession:
             print('Cant open any ENM session!')
             return None
@@ -385,9 +377,9 @@ class EnmCli(object):
         """
         support method, send command to logs
         """
-        if not os.path.exists(self.unsafe_log_dir):
-            os.mkdir(self.unsafe_log_dir)
         try:
+            if not os.path.exists(self.unsafe_log_dir):
+                os.mkdir(self.unsafe_log_dir)
             if os.path.isdir(self.unsafe_log_dir):
                 log_filename = self.unsafe_log_dir + 'ssh_cli_' + time.strftime('%Y%m%d') + '.log'
                 with open(log_filename, 'a') as log_file:
@@ -732,3 +724,9 @@ class EnmCli(object):
         process = Popen(command, stdout=PIPE, stdin=PIPE, shell=True)
         proc_stdout = process.communicate(insert_to_stdin)[0].strip()
         return proc_stdout
+
+
+if __name__ == '__main__':
+    e = EnmCli()
+    e.unprotected_mode = True
+    e.start(sys.argv)
