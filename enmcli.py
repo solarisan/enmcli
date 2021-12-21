@@ -257,7 +257,6 @@ class EnmCli(object):
             except Exception as e:
                 print("Cant write cli history to file: " + self.cli_history_file_name, e)
             if run_single_cmd:
-                print("BREEEEEAAAAAL")
                 break
             # start input for next iteration
             try:
@@ -402,8 +401,8 @@ class EnmCli(object):
         Commands need to pass enm_execute permission check!
         """
         # prepare sessions and cli options
-        if not os.path.exists(self.cmd_file_name):
-            print("cant find " + self.cmd_file_name)
+        if not os.path.exists(cmd_file_name):
+            print("cant find " + cmd_file_name)
             return False
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
             lines = file_in.readlines()
