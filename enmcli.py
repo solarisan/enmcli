@@ -95,10 +95,10 @@ class EnmCli(object):
         self.completer_file_name = cli_dir + self.completer_file_name
         self._completer_line_list = self._extend_cli_completer_list(self._completer_line_list)
 
-    def start(self, *args):
+    def start(self, args):
         """
         This method for beginning to starts CLI shell - parse input args and go to initialize_shell
-        :param sys_args:
+        :param args:
         :return:
         """
         # main, refer to infinite cli loop or execute_cmd_file
@@ -110,7 +110,7 @@ class EnmCli(object):
             self._initialize_shell_config()
             self._infinite_cli_loop()
         if len(args) == 2:
-            self._infinite_cli_loop(cmd=' '.join(sys_args[1:]), run_single_cmd=True)
+            self._infinite_cli_loop(cmd=' '.join(args[1:]), run_single_cmd=True)
         if len(args) > 2 and args[1] == '-c':
             cmd_file_name = args[2]
             out_file_name = ''
@@ -257,6 +257,7 @@ class EnmCli(object):
             except Exception as e:
                 print("Cant write cli history to file: " + self.cli_history_file_name, e)
             if run_single_cmd:
+                print("BREEEEEAAAAAL")
                 break
             # start input for next iteration
             try:
@@ -736,4 +737,5 @@ class EnmCli(object):
 if __name__ == '__main__':
     e = EnmCli()
     e.unprotected_mode = True
+    print(sys.argv)
     e.start(sys.argv)
