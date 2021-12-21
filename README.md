@@ -4,6 +4,7 @@ Allow to use Ericsson Network Management Command Line Interface via shell (for e
 May open internal enm session (when using directly on ENM scripting VM) or external enm session (when using on any Linux system, need import enmscripting module from ENM)
 
 Easy way to start using:
+
   $ python enmcli.py
 
 ____________________________________________________
