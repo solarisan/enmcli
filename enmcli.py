@@ -401,6 +401,9 @@ class EnmCli(object):
         Commands need to pass enm_execute permission check!
         """
         # prepare sessions and cli options
+        if not os.path.exists(self.cmd_file_name):
+            print("cant find " + self.cmd_file_name)
+            return False
         with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
             lines = file_in.readlines()
         file_out = None
@@ -621,6 +624,9 @@ class EnmCli(object):
         :param question:
         :return:
         """
+        if not os.path.exists(self.extend_manual_file_name):
+            print("cant find " + self.extend_manual_file_name)
+            return False
         with open(self.extend_manual_file_name, 'r') as help_file:
             help_list = help_file.read().split('@@@@@')
             help_found = False
@@ -637,6 +643,7 @@ class EnmCli(object):
                     if help.find('@@@@') >= 0:
                         if help.split('@@@@')[0].find(question) > -1:
                             print(" " * len(self.cli_input_string) + help.split('@@@@')[0])
+            return True
 
     @staticmethod
     def cli_log_copy_to_safe(unsafe_log_dir, safe_log_dir, obsolescence_days):
