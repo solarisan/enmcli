@@ -6,7 +6,7 @@ May open internal enm session (when using directly on ENM scripting VM) or exter
 Easy way to start it:
 
   $ python enmcli.py
-
+  
 ____________________________________________________
 
 For work you need just one file:
@@ -33,3 +33,37 @@ Here is additional .csv files - provides additional completers, manuals and user
 - CLI_ENM_UserGroup.csv - This file contains usernames and their group. If username not in file, user group is "default" 
 
 - CLI_ENM_UserRestrictPolicy.csv - This file contains groupname ; message-when-restrict-appears ; regular expression of restricted command. Also, message-when-restrict "permit" will permit command.
+
+
+____________________________________________________
+
+$ python enmcli.py
+
+CLI> help
+
+Type q or quit for exit from cli.
+
+Type h or help for short help.
+
+Use TAB for command completion.
+
+For start cli command by one string - "cli <command>".
+
+For start cli command file from bash - "cli -c <commandFile> <logFile>".
+  
+For start logging type "l+" or "l+ logfile.txt" (default logfile "cli_DATE_TIME.log").
+  
+For start bash cmd from cli use l, for example "l cat set.xml" )
+  
+Use bash conveyor " | " for start text processing sequence or write to file. Example:
+  
+        cmedit get * NetworkElement | grep MOSCOW | tee result.txt
+  
+Use "cli>" in bash conveyor for send output to next cli command. Example:
+  
+        cmedit get R* UtranRelation=C* | grep FDN | awk '{print "cmedit get ",$3}' | cli>
+  
+For more info about cli command use web-help, TAB or "manual "!
+  
+For question about cli.py contact or innightwolfsleep@yandex.ru
+  
