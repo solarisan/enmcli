@@ -109,14 +109,14 @@ class EnmCli(object):
             print(self.invite_help)
             self._initialize_shell_config()
             self._infinite_cli_loop()
-        if len(args) == 2:
-            self._infinite_cli_loop(cmd=' '.join(args[1:]), run_single_cmd=True)
-        if len(args) > 2 and args[1] == '-c':
+        elif len(args) > 2 and args[1] == '-c':
             cmd_file_name = args[2]
             out_file_name = ''
             if len(args) == 4:
                 out_file_name = args[3]
             self.execute_cmd_file(cmd_file_name, out_file_name)
+        else:
+            self._infinite_cli_loop(cmd=' '.join(args[1:]), run_single_cmd=True)
 
     def initialize_enm_session(self):
         """
