@@ -57,6 +57,7 @@ class EnmCli(object):
     login = None
     password = None
     # syntax options and mode
+    log_file_name = None
     unprotected_mode = False  # on/off use permission restrict policy
     cli_input_string = 'CLI> '  # input string
     conveyor_delimiter = '|'  # when u send cmd with | - string fall into bash-like conveyor
@@ -191,71 +192,47 @@ class EnmCli(object):
         :param run_single_cmd:
         :return: enm_session close status
         """
-        log_file_name = None
         # this is a loop if cmd_string not "quit"
         while cmd not in ['q', 'q ', 'quit', 'quit ']:
-            response_text = ''
             cmd = cmd.lstrip()
             # parse and execute cmd_string
-            if cmd.startswith("get "):
+            if cmd.startswith('?'):
+                print('Use TAB or "help" or "help <command>" or "manual <command>"!')
+            elif cmd in ['h', 'h ', 'help', 'help ']:
+                print(self.extended_help)
+            elif cmd.startswith('manual') or cmd.startswith('help'):
+                print(self.print_extend_manual(cmd))
+            elif cmd.startswith('ping '):
+                self.ping_ne(cmd)
+            elif cmd.startswith('execute file:'):
+                self.execute_cmd_file(cmd[13:])
+            elif cmd.startswith('l '):
+                print(self.subprocess_cmd(cmd[2:]))
+            elif cmd.startswith('l+'):
+                print(self._cli_loop_logging(cmd=cmd, action="l+"))
+            elif cmd.startswith('l-'):
+                print(self._cli_loop_logging(cmd=cmd, action="l-"))
+            elif cmd.startswith("get "):
                 try:
                     response = self.topology_browser_get_data(self.rest_session, self.url, cmd[len("get "):])
                     print(str(self.json_parsing(response, 1, "   ")))
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
-            elif cmd in ['h', 'h ', 'help', 'help ']:
-                print(self.extended_help)
-            elif cmd.startswith('ping '):
-                self.ping_ne(cmd)
-            elif cmd.startswith('manual') or cmd.startswith('help'):
-                self.print_extend_manual(cmd)
-            elif cmd.startswith('?'):
-                print('Use TAB or "help" or "help <command>" or "manual <command>"!')
-            elif cmd.startswith('execute file:'):
-                try:
-                    self.execute_cmd_file(cmd[13:])
-                except KeyboardInterrupt:
-                    print("\nInterrupted with Ctrl^C.")
-                except Exception as exc:
-                    print("Error while open file! Check path! Check restrict ' ' symbols!", exc)
-            elif cmd.startswith('l '):
-                response_text = self.subprocess_cmd(cmd[2:])
-                print(response_text)
-            elif cmd.startswith('l+'):
-                if log_file_name is None:
-                    log_file_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
-                    if len(cmd.split(' ')) > 1:
-                        if len(cmd.split(' ')[1]) > 0:
-                            log_file_name = cmd.split(' ')[1]
-                    print('set logfile: ' + log_file_name)
-                else:
-                    print('logfile already set: ' + log_file_name)
-            elif cmd.startswith('l-'):
-                if log_file_name is not None:
-                    print('logfile unset: ' + log_file_name)
-                    log_file_name = None
-                else:
-                    print('logfile already unset')
             elif len(cmd) > 0:
                 try:
-                    response_text = self._conveyor_cmd_executor(cmd)
-                    print(self._utf8_to_ascii(response_text))
+                    print(self._utf8_to_ascii(self._conveyor_cmd_executor(cmd)))
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
                 except Exception as exc:
                     print(exc)
                     break
             # try to write log&history files
-            try:
-                if log_file_name is not None and len(response_text) > 0:
-                    with open(log_file_name, 'a') as file_out:
-                        file_out.write('\n' + self.cli_input_string + cmd + '\n' + response_text)
-            except Exception as exc:
-                print("Cant write logfile! Please, check file permissions! File:" + str(log_file_name), exc)
+            print(self._cli_loop_logging(cmd=cmd))
             try:
                 readline.write_history_file(self.cli_history_file_name)
             except Exception as exc:
                 print("Cant write cli history to file: " + self.cli_history_file_name, exc)
+            # if single command mode - exit
             if run_single_cmd:
                 break
             # start input for next iteration
@@ -265,6 +242,31 @@ class EnmCli(object):
                 print "\nExit CLI with Ctrl^C. Bye!"
                 break
         return enmscripting.close(self.enm_session)
+
+    def _cli_loop_logging(self, cmd="", action="add"):
+        if action == "add":
+            try:
+                if self.log_file_name is not None and len(response_text) > 0:
+                    with open(self.log_file_name, 'a') as file_out:
+                        file_out.write('\n' + self.cli_input_string + cmd + '\n' + response_text)
+            except Exception as exc:
+                return "Cant write logfile! Please, check file permissions! File:" + str(self.log_file_name), exc
+        elif action == "l+":
+            if self.log_file_name is None:
+                self.log_file_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
+                if len(cmd.split(' ')) > 1:
+                    if len(cmd.split(' ')[1]) > 0:
+                        self.log_file_name = cmd.split(' ')[1]
+                return 'set logfile: ' + self.log_file_name
+            else:
+                return 'logfile already set: ' + self.log_file_name
+        elif action == "l-":
+            if self.log_file_name is not None:
+                old_log_file = self.log_file_name
+                self.log_file_name = None
+                return 'logfile unset' + old_log_file
+            else:
+                return 'logfile already unset'
 
     def _conveyor_cmd_executor(self, cmd_string):
         """
@@ -397,7 +399,6 @@ class EnmCli(object):
         try:
             if not os.path.exists(cmd_file_name):
                 print("cant find " + cmd_file_name)
-                return False
             with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
                 lines = file_in.readlines()
             file_out = None
@@ -410,13 +411,14 @@ class EnmCli(object):
                     if file_out is not None:
                         file_out.write(self._utf8_to_ascii('\n' + self.cli_input_string + line + '\n' + response_text))
                 except Exception as exc:
-                    print("Error in execute_cmd_file!", exc)
+                    print("Error in execute_cmd_file - file_out.write!", exc)
             if file_out is not None:
                 file_out.close()
             enmscripting.close(self.enm_session)
+        except KeyboardInterrupt:
+            print("\nInterrupted with Ctrl^C.")
         except Exception as exc:
             print("Error in execute_cmd_file", exc)
-            return False
 
     def _completion_display_matches(self, substitution, matches_list, longest_match_length):
         pass
@@ -621,24 +623,19 @@ class EnmCli(object):
         :return:
         """
         if not os.path.exists(self.extend_manual_file_name):
-            print("cant find " + self.extend_manual_file_name)
-            return False
+            return "cant find " + self.extend_manual_file_name
         with open(self.extend_manual_file_name, 'r') as help_file:
             help_list = help_file.read().split('@@@@@')
-            help_found = False
             for help in help_list:
                 if help.find('@@@@') >= 0:
                     if help.split('@@@@')[0] == question and len(help.split('@@@@')) > 1:
-                        print(help.split('@@@@')[1])
-                        help_found = True
+                        return help.split('@@@@')[1]
                     if help.split('@@@@')[0] + ' ' == question and len(help.split('@@@@')) > 1:
-                        print(help.split('@@@@')[1])
-                        help_found = True
-            if not help_found:
-                for help in help_list:
-                    if help.find('@@@@') >= 0:
-                        if help.split('@@@@')[0].find(question) > -1:
-                            print(" " * len(self.cli_input_string) + help.split('@@@@')[0])
+                        return help.split('@@@@')[1]
+            for help in help_list:
+                if help.find('@@@@') >= 0:
+                    if help.split('@@@@')[0].find(question) > -1:
+                        return " " * len(self.cli_input_string) + help.split('@@@@')[0]
             return True
 
     @staticmethod
