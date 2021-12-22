@@ -191,7 +191,7 @@ class EnmCli(object):
         :param run_single_cmd:
         :return: enm_session close status
         """
-        file_out_name = None
+        log_file_name = None
         # this is a loop if cmd_string not "quit"
         while cmd not in ['q', 'q ', 'quit', 'quit ']:
             response_text = ''
@@ -222,24 +222,24 @@ class EnmCli(object):
                 response_text = self.subprocess_cmd(cmd[2:])
                 print(response_text)
             elif cmd.startswith('l+'):
-                if file_out_name is None:
-                    file_out_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
+                if log_file_name is None:
+                    log_file_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
                     if len(cmd.split(' ')) > 1:
                         if len(cmd.split(' ')[1]) > 0:
-                            file_out_name = cmd.split(' ')[1]
-                    print('set logfile: ' + file_out_name)
+                            log_file_name = cmd.split(' ')[1]
+                    print('set logfile: ' + log_file_name)
                 else:
-                    print('logfile already set: ' + file_out_name)
+                    print('logfile already set: ' + log_file_name)
             elif cmd.startswith('l-'):
-                if file_out_name is not None:
-                    print('logfile unset: ' + file_out_name)
-                    file_out_name = None
+                if log_file_name is not None:
+                    print('logfile unset: ' + log_file_name)
+                    log_file_name = None
                 else:
                     print('logfile already unset')
             elif len(cmd) > 0:
                 try:
                     response_text = self._conveyor_cmd_executor(cmd)
-                    print(self._utf8_chars_to_space(response_text))
+                    print(self._utf8_to_ascii(response_text))
                 except KeyboardInterrupt:
                     print("\nInterrupted with Ctrl^C.")
                 except Exception as exc:
@@ -247,11 +247,11 @@ class EnmCli(object):
                     break
             # try to write log&history files
             try:
-                if file_out_name is not None and len(response_text) > 0:
-                    with open(file_out_name, 'a') as file_out:
+                if log_file_name is not None and len(response_text) > 0:
+                    with open(log_file_name, 'a') as file_out:
                         file_out.write('\n' + self.cli_input_string + cmd + '\n' + response_text)
             except Exception as exc:
-                print("Cant write logfile! Please, check file permissions! File:" + str(file_out_name), exc)
+                print("Cant write logfile! Please, check file permissions! File:" + str(log_file_name), exc)
             try:
                 readline.write_history_file(self.cli_history_file_name)
             except Exception as exc:
@@ -273,29 +273,24 @@ class EnmCli(object):
         :param cmd_string:
         :return response_text
         """
-        response_text = self.enm_execute(cmd_string.split(self.conveyor_delimiter)[0])
         # if there are conveyor delimiter in cmd_string and first command execution done, start conveyor
-        if len(cmd_string.split(self.conveyor_delimiter)) > 1 and len(response_text) > 0:
-            conveyor_cmd_list = cmd_string.split(self.conveyor_delimiter)[1:]
-            for conveyor_cmd in conveyor_cmd_list:
-                if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_cmd):
-                    next_cmd_list = response_text.split('\n')
-                    response_text = ''
-                    cmd_length_ok = 'y'
-                    if len(next_cmd_list) > self.max_conveyor_cmd_ask_user:
-                        cmd_length_ok = \
-                            raw_input('It is ' + str(len(next_cmd_list)) +
-                                      ' cli commands in sequence. Too much! Are you sure? (y/n): ')
-                    if cmd_length_ok == 'y' or cmd_length_ok == 'Y':
-                        for next_cmd in next_cmd_list:
-                            next_cmd = next_cmd.replace('\r', '').replace('\n', '')
-                            response_text = \
-                                response_text + "\n" + self.enm_execute(next_cmd)
-                    else:
-                        response_text = 'Aborted by user! Too much cli command in sequence! It is ' \
-                                        + str(len(next_cmd_list)) + 'cmd!'
+        conveyor_cmd_list = cmd_string.split(self.conveyor_delimiter)
+        response_text = conveyor_cmd_list[0]
+        for num, conveyor_cmd in enumerate(conveyor_cmd_list):
+            if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_cmd) or num == 0:
+                next_cmd_list = response_text.split('\n')
+                response_text = ''
+                cmd_length_ok = 'y'
+                if len(next_cmd_list) > self.max_conveyor_cmd_ask_user:
+                    cmd_length_ok = raw_input(str(len(next_cmd_list)) + ' cli commands in sequence! Is it OK? (y/n):')
+                if cmd_length_ok == 'y' or cmd_length_ok == 'Y':
+                    for next_cmd in next_cmd_list:
+                        next_cmd = next_cmd.replace('\r', '').replace('\n', '')
+                        response_text = response_text + "\n" + self.enm_execute(next_cmd)
                 else:
-                    response_text = self.subprocess_cmd(conveyor_cmd, response_text)
+                    response_text = 'Aborted by user! It was ' + str(len(next_cmd_list)) + ' cmd in sequence!'
+            else:
+                response_text = self.subprocess_cmd(conveyor_cmd, response_text)
         return response_text
 
     def enm_execute(self, cmd_string):
@@ -319,12 +314,12 @@ class EnmCli(object):
                             cmd_string = \
                                 cmd_string.replace(cmd_string[cmd_string.find('/'):cmd_string.rfind('/') + 1], '')
                         if not os.path.exists(file_to_upload):
-                            response_text = 'Cant find file for upload: ' + file_to_upload
+                            response_text = 'Cant find file \n' + file_to_upload + "\nin \n" + str(os.path.curdir)
                         else:
                             file_up = open(file_to_upload, 'rb')
                             cmd_string = cmd_string.replace(file_to_upload, os.path.basename(file_to_upload))
                             response = self.enm_session.terminal().execute(cmd_string, file_up)
-                            response_text = '\n'.join(response.get_output())
+                            response_text = self._utf8_to_ascii('\n'.join(response.get_output()))
                     else:
                         response = self.enm_session.terminal().execute(cmd_string)
                         response_text = '\n'.join(response.get_output())
@@ -368,9 +363,8 @@ class EnmCli(object):
                 else:
                     return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
             except Exception as exc:
-                print(exc)
-                return_value = \
-                    'cli.py script error during check permission!'
+                print("Error in _check_cmd_permission", exc)
+                return_value = 'cli.py script error during check permission!'
         return return_value
 
     def _add_cmd_to_log(self, cmd_string, username, return_value):
@@ -391,8 +385,7 @@ class EnmCli(object):
                     return exc
                 return True
         except Exception as exc:
-            print(exc)
-            print("Cant write log to " + self.unsafe_log_dir)
+            print("Error in _add_cmd_to_log! Cant write log to " + self.unsafe_log_dir, exc)
         return False
 
     def execute_cmd_file(self, cmd_file_name, out_file_name=''):
@@ -401,26 +394,29 @@ class EnmCli(object):
         Commands need to pass enm_execute permission check!
         """
         # prepare sessions and cli options
-        if not os.path.exists(cmd_file_name):
-            print("cant find " + cmd_file_name)
+        try:
+            if not os.path.exists(cmd_file_name):
+                print("cant find " + cmd_file_name)
+                return False
+            with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
+                lines = file_in.readlines()
+            file_out = None
+            if len(out_file_name.replace(' ', '')) > 2:
+                file_out = open(out_file_name.replace(' ', ''), 'a')
+            for line in lines:
+                response_text = self.enm_execute(line)
+                print(self._utf8_to_ascii('\n' + self.cli_input_string + line + '\n' + response_text))
+                try:
+                    if file_out is not None:
+                        file_out.write(self._utf8_to_ascii('\n' + self.cli_input_string + line + '\n' + response_text))
+                except Exception as exc:
+                    print("Error in execute_cmd_file!", exc)
+            if file_out is not None:
+                file_out.close()
+            enmscripting.close(self.enm_session)
+        except Exception as exc:
+            print("Error in execute_cmd_file", exc)
             return False
-        with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
-            lines = file_in.readlines()
-        file_out = None
-        if len(out_file_name.replace(' ', '')) > 2:
-            file_out = open(out_file_name.replace(' ', ''), 'a')
-        for line in lines:
-            response_text = self.enm_execute(line)
-            print('\n' + self.cli_input_string + line + '\n' + response_text)
-            try:
-                if file_out is not None:
-                    file_out.write('\n' + self.cli_input_string + line + '\n' + response_text)
-            except Exception as exc:
-                print(exc)
-                print("Cant write log!!!")
-        if file_out is not None:
-            file_out.close()
-        enmscripting.close(self.enm_session)
 
     def _completion_display_matches(self, substitution, matches_list, longest_match_length):
         pass
@@ -679,7 +675,7 @@ class EnmCli(object):
             return False
 
     @staticmethod
-    def _utf8_chars_to_space(string):
+    def _utf8_to_ascii(string):
         ss = ""
         for i in string:
             if ord(i) < 127:
@@ -736,5 +732,4 @@ class EnmCli(object):
 if __name__ == '__main__':
     e = EnmCli()
     e.unprotected_mode = True
-    print(sys.argv)
     e.start(sys.argv)
