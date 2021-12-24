@@ -192,10 +192,10 @@ class EnmCli(object):
         :param run_single_cmd:
         :return: enm_session close status
         """
-        # this is a loop if cmd_string not "quit"
+        # this is a loop if cmd not "quit"
         while cmd not in ['q', 'q ', 'quit', 'quit ']:
             cmd = cmd.lstrip()
-            # parse and execute cmd_string
+            # parse and execute cmd
             if cmd.startswith('?'):
                 print('Use TAB or "help" or "help <command>" or "manual <command>"!')
             elif cmd in ['h', 'h ', 'help', 'help ']:
@@ -268,15 +268,15 @@ class EnmCli(object):
             else:
                 return 'logfile already unset'
 
-    def _conveyor_cmd_executor(self, cmd_string):
+    def _conveyor_cmd_executor(self, cmd_str):
         """
-        This is conveyor, split cmd_string to cmd list, if it is needed,
+        This is conveyor, split cmd_str to cmd list, if it is needed,
         then run cmd one-by-one, and send previous response to next cmd
-        :param cmd_string:
+        :param cmd_str:
         :return response_text
         """
-        # if there are conveyor delimiter in cmd_string and first command execution done, start conveyor
-        conveyor_cmd_list = cmd_string.split(self.conveyor_delimiter)
+        # if there are conveyor delimiter in cmd_str and first command execution done, start conveyor
+        conveyor_cmd_list = cmd_str.split(self.conveyor_delimiter)
         response_text = conveyor_cmd_list[0]
         for num, conveyor_cmd in enumerate(conveyor_cmd_list):
             if conveyor_cmd.lstrip().startswith(self.conveyor_to_cli_cmd) or num == 0:
@@ -295,7 +295,7 @@ class EnmCli(object):
                 response_text = self.subprocess_cmd(conveyor_cmd, response_text)
         return response_text
 
-    def enm_execute(self, cmd_string):
+    def enm_execute(self, cmd_str):
         """
         This method check cli command, parse and refer to terminal_execute for running command.
         refer to _check_cmd_permission for check permissions
@@ -304,32 +304,31 @@ class EnmCli(object):
         response_text = ''
         response = None
         try:
-            if len(cmd_string) > 0:
+            if len(cmd_str) > 0:
                 user_login = os.getlogin() if self.login is None else self.login
-                cmd_permission = self._check_cmd_permission(cmd_string, user_login)
-                self._add_cmd_to_log(cmd_string, user_login, cmd_permission)
+                cmd_permission = self._check_cmd_permission(cmd_str, user_login)
+                self._add_cmd_to_log(cmd_str, user_login, cmd_permission)
                 if cmd_permission == 'permit':
-                    if cmd_string.find('file:') > -1:
-                        file_to_upload = cmd_string[cmd_string.find('file:') + 5:].split('\n')[0].split(' ')[0]
+                    if cmd_str.find('file:') > -1:
+                        file_to_upload = cmd_str[cmd_str.find('file:') + 5:].split('\n')[0].split(' ')[0]
                         file_to_upload = file_to_upload.replace('"', '')
-                        if cmd_string.find('file:/') > -1:
-                            cmd_string = \
-                                cmd_string.replace(cmd_string[cmd_string.find('/'):cmd_string.rfind('/') + 1], '')
+                        if cmd_str.find('file:/') > -1:
+                            cmd_str = cmd_str.replace(cmd_str[cmd_str.find('/'):cmd_str.rfind('/') + 1], '')
                         if not os.path.exists(file_to_upload):
                             response_text = 'Cant find file \n' + file_to_upload + "\nin \n" + str(os.path.curdir)
                         else:
                             file_up = open(file_to_upload, 'rb')
-                            cmd_string = cmd_string.replace(file_to_upload, os.path.basename(file_to_upload))
-                            response = self.enm_session.terminal().execute(cmd_string, file_up)
+                            cmd_str = cmd_str.replace(file_to_upload, os.path.basename(file_to_upload))
+                            response = self.enm_session.terminal().execute(cmd_str, file_up)
                             response_text = self._utf8_to_ascii('\n'.join(response.get_output()))
                     else:
-                        response = self.enm_session.terminal().execute(cmd_string)
+                        response = self.enm_session.terminal().execute(cmd_str)
                         response_text = '\n'.join(response.get_output())
                 else:
-                    response_text = '\n Command "' + cmd_string + '" not permitted!\n' + cmd_permission
+                    response_text = '\n Command "' + cmd_str + '" not permitted!\n' + cmd_permission
         except Exception as exc:
             print(exc)
-            response_text = '>>> Wrong command or expired session: ' + cmd_string
+            response_text = '>>> Wrong command or expired session: ' + cmd_str
         if response is not None:
             if response.has_files():
                 for enm_file in response.files():
@@ -337,10 +336,10 @@ class EnmCli(object):
                     response_text = response_text + '\nfile downloaded ' + os.getcwd() + '/' + enm_file.get_name()
         return response_text
 
-    def _check_cmd_permission(self, cmd_string, username):
+    def _check_cmd_permission(self, cmd_str, username):
         """
         support method, get command permissions
-        :param cmd_string:
+        :param cmd_str:
         :param username:
         :return:
         """
@@ -359,7 +358,7 @@ class EnmCli(object):
                     with open(self.restrict_policy_file_name, 'r') as policy_file:
                         for line in policy_file:
                             if line.split(';')[0] == user_group:
-                                if search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_string,
+                                if search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_str,
                                           IGNORECASE) is not None:
                                     return_value = line.split(';')[1].replace('USERNAME', username)
                 else:
@@ -369,7 +368,7 @@ class EnmCli(object):
                 return_value = 'cli.py script error during check permission!'
         return return_value
 
-    def _add_cmd_to_log(self, cmd_string, username, return_value):
+    def _add_cmd_to_log(self, cmd_str, username, return_value):
         """
         support method, send command to logs
         """
@@ -377,10 +376,11 @@ class EnmCli(object):
             if not os.path.exists(self.unsafe_log_dir):
                 os.mkdir(self.unsafe_log_dir)
             if os.path.isdir(self.unsafe_log_dir):
-                log_filename = self.unsafe_log_dir + 'ssh_cli_' + time.strftime('%Y%m%d') + '.log'
+                now_d = time.strftime('%Y%m%d')
+                now_t = time.strftime('%%H%M%S')
+                log_filename = self.unsafe_log_dir + 'ssh_cli_' + now_d + '.log'
                 with open(log_filename, 'a') as log_file:
-                    log_file.write(
-                        '\n' + time.strftime('%Y%m%d_%H%M%S') + ';' + username + ';' + return_value + ';' + cmd_string)
+                    log_file.write('\n' + now_d + '_' + now_t + ';' + username + ';' + return_value + ';' + cmd_str)
                 try:
                     os.chmod(log_filename, 0o0666)
                 except Exception as exc:
@@ -453,15 +453,12 @@ class EnmCli(object):
                     self.__last_completer_list = []
                     for line in self._completer_line_list:
                         if len(line.split('@')[0].split(' ')) == word_n \
-                                and line.startswith(text) \
-                                and not line.startswith('@'):
+                                and line.startswith(text) and not line.startswith('@'):
                             self.__last_completer_list.append(line)
                 self._cli_completer_text = text
-            out_line = self.__last_completer_list[state].replace('@', ' ' * (self.completer_lead_space_num -
-                                                                             len(self.__last_completer_list[
-                                                                                     state].split('@')[0])))
-            out_line = out_line.replace('\n', '').replace('\r', '')
-            out_line = ' ' * len(self.cli_input_string) + out_line
+            out_spaces = ' ' * (self.completer_lead_space_num - len(self.__last_completer_list[state].split('@')[0]))
+            out_line = self.__last_completer_list[state].replace('@', out_spaces)
+            out_line = ' ' * len(self.cli_input_string) + out_line.replace('\n', '').replace('\r', '')
             sys.stdout.write('\n' + str(out_line))
             sys.stdout.flush()
             if state == len(self.__last_completer_list) - 1:
