@@ -81,12 +81,14 @@ class EnmCli(object):
                             'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
                             'get@topology browser cli, use <TAB> for navigate topology']
 
-    def __init__(self, cli_dir=""):
+    def __init__(self, cli_dir="~"):
         """
         initial code, set folder with all supplementary files (log dir, restriction files, help files...)
         :param cli_dir:
         """
         # init other internal params
+        if cli_dir == "~":
+            cli_dir = os.path.expanduser(cli_dir)
         self.cli_history_file_name = os.path.expanduser(self.cli_history_file_name)
         self.user_group_file_name = cli_dir + self.user_group_file_name
         self.restrict_policy_file_name = cli_dir + self.restrict_policy_file_name
@@ -197,37 +199,36 @@ class EnmCli(object):
             cmd = cmd.lstrip()
             # parse and execute cmd
             if cmd.startswith('?'):
-                print('Use TAB or "help" or "help <command>" or "manual <command>"!')
+                self._cli_print(cmd, 'Use TAB or "help" or "help <command>" or "manual <command>"!')
             elif cmd in ['h', 'h ', 'help', 'help ']:
-                print(self.extended_help)
+                self._cli_print(cmd, self.extended_help)
             elif cmd.startswith('manual') or cmd.startswith('help'):
-                print(self.print_extend_manual(cmd))
+                self._cli_print(cmd, self.print_extend_manual(cmd))
             elif cmd.startswith('ping '):
-                self.ping_ne(cmd)
+                self._cli_print(cmd, self.ping_ne(cmd), resp_print=False)
             elif cmd.startswith('execute file:'):
                 self.execute_cmd_file(cmd[13:])
             elif cmd.startswith('l '):
-                print(self.subprocess_cmd(cmd[2:]))
+                self._cli_print(cmd, self.subprocess_cmd(cmd[2:]))
             elif cmd.startswith('l+'):
-                print(self._cli_loop_logging(cmd=cmd, action="l+"))
+                self._cli_print(cmd, self._cli_user_logging_on_off(action="l+", file_name=cmd[3:]))
             elif cmd.startswith('l-'):
-                print(self._cli_loop_logging(cmd=cmd, action="l-"))
+                self._cli_print(cmd, self._cli_user_logging_on_off(action="l-"))
             elif cmd.startswith("get "):
                 try:
                     response = self.topology_browser_get_data(self.rest_session, self.url, cmd[len("get "):])
-                    print(str(self.json_parsing(response, 1, "   ")))
+                    self._cli_print(cmd, str(self.json_parsing(response, 1, "   ")))
                 except KeyboardInterrupt:
-                    print("\nInterrupted with Ctrl^C.")
+                    self._cli_print(cmd, "\nInterrupted with Ctrl^C.")
             elif len(cmd) > 0:
                 try:
-                    print(self._utf8_to_ascii(self._conveyor_cmd_executor(cmd)))
+                    self._cli_print(cmd, self._conveyor_cmd_executor(cmd))
                 except KeyboardInterrupt:
-                    print("\nInterrupted with Ctrl^C.")
+                    self._cli_print(cmd, "\nInterrupted with Ctrl^C.")
                 except Exception as exc:
-                    print(exc)
+                    print("Something wrong with _conveyor_cmd_executor", exc)
                     break
             # try to write log&history files
-            print(self._cli_loop_logging(cmd=cmd))
             try:
                 readline.write_history_file(self.cli_history_file_name)
             except Exception as exc:
@@ -243,20 +244,31 @@ class EnmCli(object):
                 break
         return enmscripting.close(self.enm_session)
 
-    def _cli_loop_logging(self, cmd="", action="add"):
-        if action == "add":
-            try:
-                if self.log_file_name is not None and len(response_text) > 0:
-                    with open(self.log_file_name, 'a') as file_out:
-                        file_out.write('\n' + self.cli_input_string + cmd + '\n' + response_text)
-            except Exception as exc:
-                return "Cant write logfile! Please, check file permissions! File:" + str(self.log_file_name), exc
-        elif action == "l+":
+    def _cli_print(self, cmd="", response="", resp_print=True, cmd_print=False):
+        try:
+            if cmd_print:
+                print(self._utf8_to_ascii(cmd))
+            if resp_print:
+                print(self._utf8_to_ascii(response))
+        except Exception as exc:
+            print("Problem with printing to terminal!", exc)
+            return False
+        try:
+            if self.log_file_name is not None:
+                with open(self.log_file_name, 'a') as file_out:
+                    file_out.write('\n' + self.cli_input_string + cmd + '\n' + response)
+                    return True
+        except Exception as exc:
+            print("Cant write logfile! Please, check file permissions! File:" + str(self.log_file_name), exc)
+            return False
+
+    def _cli_user_logging_on_off(self, action="l+", file_name=""):
+        if action == "l+":
             if self.log_file_name is None:
-                self.log_file_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
-                if len(cmd.split(' ')) > 1:
-                    if len(cmd.split(' ')[1]) > 0:
-                        self.log_file_name = cmd.split(' ')[1]
+                if file_name == "":
+                    self.log_file_name = 'cli_' + time.strftime('%Y%m%d_%H%M%S') + '.log'
+                else:
+                    self.log_file_name = file_name
                 return 'set logfile: ' + self.log_file_name
             else:
                 return 'logfile already set: ' + self.log_file_name
@@ -264,7 +276,7 @@ class EnmCli(object):
             if self.log_file_name is not None:
                 old_log_file = self.log_file_name
                 self.log_file_name = None
-                return 'logfile unset' + old_log_file
+                return 'logfile unset: ' + old_log_file
             else:
                 return 'logfile already unset'
 
@@ -295,7 +307,7 @@ class EnmCli(object):
                 response_text = self.subprocess_cmd(conveyor_cmd, response_text)
         return response_text
 
-    def enm_execute(self, cmd_str):
+    def enm_execute(self, cmd):
         """
         This method check cli command, parse and refer to terminal_execute for running command.
         refer to _check_cmd_permission for check permissions
@@ -304,31 +316,31 @@ class EnmCli(object):
         response_text = ''
         response = None
         try:
-            if len(cmd_str) > 0:
+            if len(cmd) > 0:
                 user_login = os.getlogin() if self.login is None else self.login
-                cmd_permission = self._check_cmd_permission(cmd_str, user_login)
-                self._add_cmd_to_log(cmd_str, user_login, cmd_permission)
+                cmd_permission = self._check_cmd_permission(cmd, user_login)
+                self._add_cmd_to_log(cmd, user_login, cmd_permission)
                 if cmd_permission == 'permit':
-                    if cmd_str.find('file:') > -1:
-                        file_to_upload = cmd_str[cmd_str.find('file:') + 5:].split('\n')[0].split(' ')[0]
+                    if cmd.find('file:') > -1:
+                        file_to_upload = cmd[cmd.find('file:') + 5:].split('\n')[0].split(' ')[0]
                         file_to_upload = file_to_upload.replace('"', '')
-                        if cmd_str.find('file:/') > -1:
-                            cmd_str = cmd_str.replace(cmd_str[cmd_str.find('/'):cmd_str.rfind('/') + 1], '')
+                        if cmd.find('file:/') > -1:
+                            cmd = cmd.replace(cmd[cmd.find('/'):cmd.rfind('/') + 1], '')
                         if not os.path.exists(file_to_upload):
                             response_text = 'Cant find file \n' + file_to_upload + "\nin \n" + str(os.path.curdir)
                         else:
                             file_up = open(file_to_upload, 'rb')
-                            cmd_str = cmd_str.replace(file_to_upload, os.path.basename(file_to_upload))
-                            response = self.enm_session.terminal().execute(cmd_str, file_up)
-                            response_text = self._utf8_to_ascii('\n'.join(response.get_output()))
+                            cmd = cmd.replace(file_to_upload, os.path.basename(file_to_upload))
+                            response = self.enm_session.terminal().execute(cmd, file_up)
+                            response_text = '\n'.join(response.get_output())
                     else:
-                        response = self.enm_session.terminal().execute(cmd_str)
+                        response = self.enm_session.terminal().execute(cmd)
                         response_text = '\n'.join(response.get_output())
                 else:
-                    response_text = '\n Command "' + cmd_str + '" not permitted!\n' + cmd_permission
+                    response_text = '\n Command "' + cmd + '" not permitted!\n' + cmd_permission
         except Exception as exc:
             print(exc)
-            response_text = '>>> Wrong command or expired session: ' + cmd_str
+            response_text = '>>> Wrong command or expired session: ' + cmd
         if response is not None:
             if response.has_files():
                 for enm_file in response.files():
@@ -390,30 +402,23 @@ class EnmCli(object):
             print("Error in _add_cmd_to_log! Cant write log to " + self.unsafe_log_dir, exc)
         return False
 
-    def execute_cmd_file(self, cmd_file_name, out_file_name=''):
+    def execute_cmd_file(self, cmd_file_name, out_file_name=""):
         """
         This method using to read command file and send command to enm terminal.
         Commands need to pass enm_execute permission check!
         """
         # prepare sessions and cli options
         try:
+            if out_file_name != "":
+                self._cli_user_logging_on_off(action="l+", file_name=out_file_name)
             if not os.path.exists(cmd_file_name):
                 print("cant find " + cmd_file_name)
             with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
-                lines = file_in.readlines()
-            file_out = None
-            if len(out_file_name.replace(' ', '')) > 2:
-                file_out = open(out_file_name.replace(' ', ''), 'a')
-            for line in lines:
-                response_text = self.enm_execute(line)
-                print(self._utf8_to_ascii('\n' + self.cli_input_string + line + '\n' + response_text))
-                try:
-                    if file_out is not None:
-                        file_out.write(self._utf8_to_ascii('\n' + self.cli_input_string + line + '\n' + response_text))
-                except Exception as exc:
-                    print("Error in execute_cmd_file - file_out.write!", exc)
-            if file_out is not None:
-                file_out.close()
+                for line in file_in.readlines():
+                    response_text = self.enm_execute(line)
+                    self._cli_print(line, response_text, cmd_print=True)
+            if out_file_name != "":
+                self._cli_user_logging_on_off(action="l-")
             enmscripting.close(self.enm_session)
         except KeyboardInterrupt:
             print("\nInterrupted with Ctrl^C.")
@@ -567,7 +572,7 @@ class EnmCli(object):
             return None
 
     def ping_ne(self, cmd):
-        result = []
+        result = ''
         try:
             if len(cmd.split(" ")) > 1:
                 ne = cmd.split(" ")[1]
@@ -606,7 +611,7 @@ class EnmCli(object):
                         try:
                             cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
                             process = Popen(cmd, stderr=PIPE, shell=True)
-                            result.append({node_id: process.communicate('')})
+                            result = result + str(node_id) + "\n" + process.communicate('')[0] + "\n"
                         except Exception as exc:
                             print(exc)
         except KeyboardInterrupt:
