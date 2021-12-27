@@ -81,14 +81,14 @@ class EnmCli(object):
                             'ping@ping NetworkElement by name: "ping MOSCOW001" or "ping BSC* -i 0.2 -c 2 -s 1500"',
                             'get@topology browser cli, use <TAB> for navigate topology']
 
-    def __init__(self, cli_dir="~"):
+    def __init__(self, cli_dir=""):
         """
         initial code, set folder with all supplementary files (log dir, restriction files, help files...)
         :param cli_dir:
         """
         # init other internal params
-        if cli_dir == "~":
-            cli_dir = os.path.expanduser(cli_dir)
+        if cli_dir == "":
+            cli_dir = os.path.dirname(os.path.abspath(__file__))
         self.cli_history_file_name = os.path.expanduser(self.cli_history_file_name)
         self.user_group_file_name = cli_dir + self.user_group_file_name
         self.restrict_policy_file_name = cli_dir + self.restrict_policy_file_name
@@ -603,17 +603,22 @@ class EnmCli(object):
             except Exception as exc:
                 print("enm session error! May be session is expired?\n", exc)
                 return False
+            ne_list = []
             for s in response.get_output():
                 if len(s.split("\t")) == 4:
-                    node_id, sync_status, connectivity_info, ip_address = s.split("\t")
-                    if search(r"\d*\.\d*\.\d*\.\d*", ip_address) is not None:
-                        print(node_id)
-                        try:
-                            cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
-                            process = Popen(cmd, stderr=PIPE, shell=True)
-                            result = result + str(node_id) + "\n" + process.communicate('')[0] + "\n"
-                        except Exception as exc:
-                            print(exc)
+                    ne_list.append(s.split("\t"))
+            if len(ne_list) == 0:
+                ne_list.append([ne, "UNKNOWN", "UNKNOWN", ne])
+            for ne in ne_list:
+                node_id, sync_status, connectivity_info, ip_address = ne
+                if search(r"\d*\.\d*\.\d*\.\d*", ip_address) is not None:
+                    print(node_id + " : " + ip_address)
+                    try:
+                        cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
+                        process = Popen(cmd, stderr=PIPE, shell=True)
+                        result = result + str(node_id) + " : " + str(process.communicate('')[0]) + "\n"
+                    except Exception as exc:
+                        print(exc)
         except KeyboardInterrupt:
             print("ping stopped by user")
         return result
