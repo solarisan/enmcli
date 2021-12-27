@@ -1,5 +1,5 @@
 
-
+alias "ls" "cmedit get * NetworkElement"
 
 alias "getip $1" "cmedit get $1 ComConnectivityInformation.ipAddress;CppConnectivityInformation.ipAddress;BscConnectivityInformation.ipAddress;StnConnectivityInformation.ipAddress -t -s"
 
