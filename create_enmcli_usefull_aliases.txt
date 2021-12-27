@@ -3,7 +3,7 @@
 
 alias "getip $1" "cmedit get $1 ComConnectivityInformation.ipAddress;CppConnectivityInformation.ipAddress;BscConnectivityInformation.ipAddress;StnConnectivityInformation.ipAddress -t -s"
 
-alias "getcell $1" "cmedit get * GeranCell.(GeranCellid==$1,state);UtranCell.(UtranCellId==$1,operationalState,administrativeState);eUtranCellFDD.(eUtranCellFDDid==$1,operationalState,administrativeSta
+alias "getcell $1" "cmedit get * GeranCell.(GeranCellid==$1,state);UtranCell.(UtranCellId==$1,operationalState,administrativeState);eUtranCellFDD.(eUtranCellFDDid==$1,operationalState,administrativeState) -t"
 
 alias "getsync $1" "cmedit get $1 cmFunction.*"
 
