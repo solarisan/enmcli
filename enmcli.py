@@ -3,14 +3,14 @@
 """
 enmcli - give access to Ericsson Network Manager Command Line Interface (cli)
 from terminal shell on any other system (unix, windows...)
-enmcli have extended ability for logging, restrict policy, linux conveying, mo-tree-navigating, pinging, built-in...
+enmcli have extended ability for logging, restrict policy, linux conveying, mo-tree-navigating and pinging...
 Notice:
 This module use library "enmscripting" - property of Ericsson, so it isn't included here.
 But if you have access to Ericsson Network Manager - obviously, you have access to this library)
-Just copy enmscripting to enmcli folder.
-Also, if you install enmcli on ENM scripting VM - you will able to use it without additional actions.
+Just copy it from ENM folder /usr/lib64/python2.6/site-packages/enmscripting to enmcli folder.
+Also, if you install enmcli on ENM scripting VM - you will able to use it without copy.
 @author:    Ilya Shevchenko
-@contact:   inightwolfsleep@yandex.ru
+@contact:   innightwolfsleep@yandex.ru
 """
 
 import enmscripting  # enmscripting is a Ericsson property library
@@ -23,7 +23,7 @@ from getpass import getpass
 from json import loads as j_loads
 from socket import gethostbyname
 from re import search, IGNORECASE
-import readline  # use pyreadline on Windows system
+import readline  # need to install module pyreadline for Windows system
 
 
 class EnmCli(object):
@@ -205,7 +205,7 @@ class EnmCli(object):
             elif cmd.startswith('manual') or cmd.startswith('help'):
                 self._cli_print(cmd, self.print_extend_manual(cmd))
             elif cmd.startswith('ping '):
-                self._cli_print(cmd, self.ping_ne(cmd), resp_print=False)
+                self._cli_print(cmd, self.ping_ne(cmd), print_out=False)
             elif cmd.startswith('execute file:'):
                 self.execute_cmd_file(cmd[13:])
             elif cmd.startswith('l '):
@@ -216,8 +216,8 @@ class EnmCli(object):
                 self._cli_print(cmd, self._cli_user_logging_on_off(action="l-"))
             elif cmd.startswith("get "):
                 try:
-                    response = self.topology_browser_get_data(self.rest_session, self.url, cmd[len("get "):])
-                    self._cli_print(cmd, str(self.json_parsing(response, 1, "   ")))
+                    json_response = self.persistent_object_get_data(self.rest_session, self.url, cmd[len("get "):])
+                    self._cli_print(cmd, str(self.json_parsing(json_response, 1, "   ")))
                 except KeyboardInterrupt:
                     self._cli_print(cmd, "\nInterrupted with Ctrl^C.")
             elif len(cmd) > 0:
@@ -244,11 +244,11 @@ class EnmCli(object):
                 break
         return enmscripting.close(self.enm_session)
 
-    def _cli_print(self, cmd="", response="", resp_print=True, cmd_print=False):
+    def _cli_print(self, cmd="", response="", print_out=True, print_in=False):
         try:
-            if cmd_print:
+            if print_in:
                 print(self._utf8_to_ascii(cmd))
-            if resp_print:
+            if print_out:
                 print(self._utf8_to_ascii(response))
         except Exception as exc:
             print("Problem with printing to terminal!", exc)
@@ -416,7 +416,7 @@ class EnmCli(object):
             with open(cmd_file_name.replace(' ', ''), 'r') as file_in:
                 for line in file_in.readlines():
                     response_text = self.enm_execute(line)
-                    self._cli_print(line, response_text, cmd_print=True)
+                    self._cli_print(line, response_text, print_in=True)
             if out_file_name != "":
                 self._cli_user_logging_on_off(action="l-")
             enmscripting.close(self.enm_session)
@@ -556,7 +556,7 @@ class EnmCli(object):
             return None
 
     @staticmethod
-    def topology_browser_get_data(s, url="", fdn=""):
+    def persistent_object_get_data(s, url="", fdn=""):
         try:
             if fdn[-1] == ",":
                 fdn = fdn[:-1]
@@ -564,7 +564,7 @@ class EnmCli(object):
             if resp.status_code == 404:
                 return j_loads(resp.content)
             elif resp.status_code != 200:
-                return ["Wrong credentials or session expired!"]
+                return None
             else:
                 return j_loads(resp.content)
         except Exception as exc:
@@ -581,41 +581,27 @@ class EnmCli(object):
             ping_args = ["-c", "4"]
             if len(cmd.split(" ")) > 2:
                 ping_args.extend(cmd.split(" ")[2:])
-            mos = "BscConnectivityInformation.ipaddress;CbpOiConnectivityInformation.ipaddress;" \
-                  "ComConnectivityInformation.ipaddress;" \
-                  "CppConnectivityInformation.ipaddress;EceeConnectivityInformation.ipaddress" \
-                  ";EciConnectivityInformation.ipaddress;EosConnectivityInformation.ipaddress" \
-                  ";Er6000ConnectivityInformation.ipaddress;EsaConnectivityInformation.ipaddress" \
-                  ";EscConnectivityInformation.ipaddress;ExosConnectivityInformation.ipaddress" \
-                  ";FrontHaul6000ConnectivityInformation.ipaddress;FrontHaul6080ConnectivityInformation.ipaddress" \
-                  ";GenericFmNodeConnectivityInformation.ipaddress;GenericSnmpNodeConnectivityInformation.ipaddress" \
-                  ";HdsConnectivityInformation.ipaddress;HlrFeConnectivityInformation.ipaddress" \
-                  ";HttpConnectivityInformation.ipaddress;IposOiConnectivityInformation.ipaddress" \
-                  ";IsConnectivityInformation.ipaddress;MINILINKIndoorConnectivityInformation.ipaddress" \
-                  ";MINILINKOutdoorConnectivityInformation.ipaddress;MscConnectivityInformation.ipaddress" \
-                  ";R8800ConnectivityInformation.ipaddress;SSRConnectivityInformation.ipaddress" \
-                  ";STNConnectivityInformation.ipaddress;TspConnectivityInformation.ipaddress;" \
-                  "VREConnectivityInformation" \
-                  ".ipaddress "
-            search_cmd = 'cmedit get ' + ne + ' ' + mos + ' -t -s'
             try:
-                response = self.enm_session.terminal().execute(search_cmd)
+                response = self.enm_session.terminal().execute('cmedit get ' + ne + ' NetworkElement')
             except Exception as exc:
                 print("enm session error! May be session is expired?\n", exc)
                 return False
             ne_list = []
             for s in response.get_output():
-                if len(s.split("\t")) == 4:
-                    ne_list.append(s.split("\t"))
+                if s.startswith("FDN : NetworkElement="):
+                    json_response = self.persistent_object_get_data(self.rest_session, self.url, s[len("FDN : "):])
+                    for i in json_response["networkDetails"]:
+                        if i["key"] == "ipAddress":
+                            ne_list.append([s.split("=")[1], i["value"]])
+                            break
             if len(ne_list) == 0:
-                ne_list.append([ne, "UNKNOWN", "UNKNOWN", ne])
+                ne_list.append([ne, ne])
             for ne in ne_list:
-                node_id, sync_status, connectivity_info, ip_address = ne
+                node_id, ip_address = ne
                 if search(r"\d*\.\d*\.\d*\.\d*", ip_address) is not None:
                     print(node_id + " : " + ip_address)
                     try:
-                        cmd = 'ping ' + ip_address + " " + " ".join(ping_args)
-                        process = Popen(cmd, stderr=PIPE, shell=True)
+                        process = Popen('ping ' + ip_address + " " + " ".join(ping_args), stderr=PIPE, shell=True)
                         result = result + str(node_id) + " : " + str(process.communicate('')[0]) + "\n"
                     except Exception as exc:
                         print(exc)
