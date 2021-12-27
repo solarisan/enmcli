@@ -217,7 +217,7 @@ class EnmCli(object):
             elif cmd.startswith("get "):
                 try:
                     json_response = self.persistent_object_get_data(self.rest_session, self.url, cmd[len("get "):])
-                    self._cli_print(cmd, str(self.json_parsing(json_response, 1, "   ")))
+                    self._cli_print(cmd, str(self.json_to_pretty_text(json_response, 1, "   ")))
                 except KeyboardInterrupt:
                     self._cli_print(cmd, "\nInterrupted with Ctrl^C.")
             elif len(cmd) > 0:
@@ -361,17 +361,16 @@ class EnmCli(object):
             try:
                 if os.path.exists(self.user_group_file_name):
                     with open(self.user_group_file_name, 'r') as user_file:
-                        for line in user_file:
+                        for line in user_file.read().replace("\r", "").split("\n"):
                             if line.split(';')[0] == username:
-                                user_group = line.split(';')[1].replace('\n', '').replace('\r', '')
+                                user_group = line.split(';')[1]
                 else:
                     return_value = 'cant find UserFile'
                 if os.path.exists(self.restrict_policy_file_name):
                     with open(self.restrict_policy_file_name, 'r') as policy_file:
-                        for line in policy_file:
+                        for line in policy_file.read().replace("\r", "").split("\n"):
                             if line.split(';')[0] == user_group:
-                                if search(line.split(';')[2].replace('\n', '').replace('\r', ''), cmd_str,
-                                          IGNORECASE) is not None:
+                                if search(line.split(';')[2], cmd_str, IGNORECASE) is not None:
                                     return_value = line.split(';')[1].replace('USERNAME', username)
                 else:
                     return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
@@ -389,7 +388,7 @@ class EnmCli(object):
                 os.mkdir(self.unsafe_log_dir)
             if os.path.isdir(self.unsafe_log_dir):
                 now_d = time.strftime('%Y%m%d')
-                now_t = time.strftime('%%H%M%S')
+                now_t = time.strftime('%H%M%S')
                 log_filename = self.unsafe_log_dir + 'ssh_cli_' + now_d + '.log'
                 with open(log_filename, 'a') as log_file:
                     log_file.write('\n' + now_d + '_' + now_t + ';' + username + ';' + return_value + ';' + cmd_str)
@@ -568,7 +567,7 @@ class EnmCli(object):
             else:
                 return j_loads(resp.content)
         except Exception as exc:
-            print("topology_browser_get_data", exc)
+            print("persistent_object_get_data error", exc)
             return None
 
     def ping_ne(self, cmd):
@@ -675,16 +674,16 @@ class EnmCli(object):
         return ss
 
     @staticmethod
-    def json_parsing(json_obj, lvl, w_space=" ", delimiter=" : "):
+    def json_to_pretty_text(json_obj, lvl, w_space=" ", delimiter=" : "):
         txt = ""
         if isinstance(json_obj, dict):
             if "key" in json_obj and "value" in json_obj:
                 if isinstance(json_obj["value"], dict):
                     txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimiter
-                    txt = txt + "\n" + EnmCli.json_parsing(json_obj["value"], lvl + 1, w_space)
+                    txt = txt + "\n" + EnmCli.json_to_pretty_text(json_obj["value"], lvl + 1, w_space)
                 elif isinstance(json_obj["value"], list):
                     txt = txt + "\n" + w_space * lvl + json_obj["key"] + delimiter
-                    txt = txt + "\n" + EnmCli.json_parsing(json_obj["value"], lvl + 1, w_space)
+                    txt = txt + "\n" + EnmCli.json_to_pretty_text(json_obj["value"], lvl + 1, w_space)
                 else:
                     txt = txt + "\n" + str(w_space * lvl) + json_obj["key"] + delimiter + str(
                         json_obj["value"])
@@ -692,19 +691,19 @@ class EnmCli(object):
                 for i in json_obj:
                     if isinstance(json_obj[i], dict):
                         txt = txt + "\n" + w_space * lvl + i + delimiter
-                        txt = txt + "\n" + EnmCli.json_parsing(json_obj[i], lvl + 1, w_space)
+                        txt = txt + "\n" + EnmCli.json_to_pretty_text(json_obj[i], lvl + 1, w_space)
                     elif isinstance(json_obj[i], list):
                         txt = txt + "\n" + w_space * lvl + i + delimiter
-                        txt = txt + "\n" + EnmCli.json_parsing(json_obj[i], lvl + 1, w_space)
+                        txt = txt + "\n" + EnmCli.json_to_pretty_text(json_obj[i], lvl + 1, w_space)
                     else:
                         if i != "datatype":
                             txt = txt + "\n" + str(w_space * lvl) + i + delimiter + str(json_obj[i])
         if isinstance(json_obj, list):
             for i in json_obj:
                 if isinstance(i, dict):
-                    txt = txt + "\n" + EnmCli.json_parsing(i, lvl + 1, w_space)
+                    txt = txt + "\n" + EnmCli.json_to_pretty_text(i, lvl + 1, w_space)
                 elif isinstance(i, list):
-                    txt = txt + "\n" + EnmCli.json_parsing(i, lvl + 1, w_space)
+                    txt = txt + "\n" + EnmCli.json_to_pretty_text(i, lvl + 1, w_space)
                 else:
                     txt = txt + "\n" + str(w_space * lvl) + str(i)
         return txt.replace("\n\n", "\n")
