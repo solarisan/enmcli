@@ -1,7 +1,7 @@
 # enm_cli
-Allow to use Ericsson Network Management Command Line Interface via shell (for example, ssh terminal via putty).
+Allows to use Ericsson Network Management Command Line Interface via shell (for example, ssh terminal via putty).
 
-May open internal enm session (when using directly on ENM scripting VM) or external enm session (when using on any Linux system, need import enmscripting module from ENM)
+May open internal enm session (when runnig directly on ENM scripting VM) or external enm session (when running on any other system, need import enmscripting module from ENM)
 
 Easy way to start it:
 
@@ -11,22 +11,22 @@ ____________________________________________________
 
 For work you need just one file:
 
-- enmcli.py - its contains main code and may by started alone
+- enmcli.py - it's contains main code and may by runed alone
 
 
-Here is additional scripts with logging, comand restrictions and ruming on multiply systems:
+Next is additional scripts with logging, comand restrictions and ruming on multiply systems:
 
 - cli_start.py - contain improved start shell code (with logging, command restriction and other).
   python cli_start.py
 
 - cli_save_log.py - aditional utility, will move user logs from unsafe log dirrectory to safe directory. May be croned for each minute.
 
-- cli_cmd_all.py - utility will run single cli command from arguments on several external ENM (list in code)
+- cli_cmd_all.py - utility will run single cli command from arguments on several external ENM (list inside .py code)
 
 
-Here is additional .csv files - provides additional completers, manuals and user restrction rules:
+Next is additional .csv files - provides additional completers, manuals and user restrictions rules:
 
-- CLI_ENM_Completer.csv - This file contains command completer for cli terminal
+- CLI_ENM_Completer.csv - This file contains <TAB> command completer for cli, may extended by user
 
 - CLI_ENM_help.csv - This file contains help manual pages for command
 
