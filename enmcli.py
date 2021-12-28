@@ -7,8 +7,9 @@ enmcli have extended ability for logging, restrict policy, linux conveying, mo-t
 Notice:
 This module use library "enmscripting" - property of Ericsson, so it isn't included here.
 But if you have access to Ericsson Network Manager - obviously, you have access to this library)
-Just copy it from ENM folder /usr/lib64/python2.6/site-packages/enmscripting to enmcli folder.
-Also, if you install enmcli on ENM scripting VM - you will able to use it without copy.
+There is two version enmscripting module - version='1.21.1' for external and version='1.20.1' for ENM-VM-internal use
+Enmcli may use both enmscripting version on client workstation.
+Also, if you install enmcli on ENM scripting VM - you don't need to install enmscripting.
 @author:    Ilya Shevchenko
 @contact:   innightwolfsleep@yandex.ru
 """
@@ -140,12 +141,12 @@ class EnmCli(object):
 
     def _initialize_internal_enm_session(self):
         try:
-            new_enm_session = enmscripting.open()
+            new_enm_session = enmscripting.open(self.url, self.login, self.password)
             if self.url is None:
                 self.url = self.get_internal_enm_url()
             return new_enm_session
         except Exception as exc:
-            print("Cant open internal enm session", exc)
+            print("Cant open internal enm session: " + str(exc))
             return None
 
     def _ask_enm_url_login_password(self, ask_new=False):
@@ -164,7 +165,7 @@ class EnmCli(object):
                 enmscripting.security.authenticator.UsernameAndPassword(self.login, self.password))
             return new_enm_session
         except Exception as exc:
-            print("Cant open external enm session", exc)
+            print("Cant open external enm session: " + str(exc))
             return None
 
     def _initialize_shell_config(self):
@@ -226,13 +227,13 @@ class EnmCli(object):
                 except KeyboardInterrupt:
                     self._cli_print(cmd, "\nInterrupted with Ctrl^C.")
                 except Exception as exc:
-                    print("Something wrong with _conveyor_cmd_executor", exc)
+                    print("Something wrong with _conveyor_cmd_executor: " + str(exc))
                     break
             # try to write log&history files
             try:
                 readline.write_history_file(self.cli_history_file_name)
             except Exception as exc:
-                print("Cant write cli history to file: " + self.cli_history_file_name, exc)
+                print("Cant write cli history to file: " + str(exc))
             # if single command mode - exit
             if run_single_cmd:
                 break
@@ -251,7 +252,7 @@ class EnmCli(object):
             if print_out:
                 print(self._utf8_to_ascii(response))
         except Exception as exc:
-            print("Problem with printing to terminal!", exc)
+            print("Problem with printing to terminal: " + str(exc))
             return False
         try:
             if self.log_file_name is not None:
@@ -259,7 +260,7 @@ class EnmCli(object):
                     file_out.write('\n' + self.cli_input_string + cmd + '\n' + response)
                     return True
         except Exception as exc:
-            print("Cant write logfile! Please, check file permissions! File:" + str(self.log_file_name), exc)
+            print("Cant write logfile! Please, check file permissions! File:" + str(self.log_file_name) + str(exc))
             return False
 
     def _cli_user_logging_on_off(self, action="l+", file_name=""):
@@ -375,7 +376,7 @@ class EnmCli(object):
                 else:
                     return_value = 'cant find PolicyFile ' + self.restrict_policy_file_name
             except Exception as exc:
-                print("Error in _check_cmd_permission", exc)
+                print("Error in _check_cmd_permission: " + str(exc))
                 return_value = 'cli.py script error during check permission!'
         return return_value
 
@@ -398,7 +399,7 @@ class EnmCli(object):
                     return exc
                 return True
         except Exception as exc:
-            print("Error in _add_cmd_to_log! Cant write log to " + self.unsafe_log_dir, exc)
+            print("Error in _add_cmd_to_log! Cant write log to " + self.unsafe_log_dir + "\n" + str(exc))
         return False
 
     def execute_cmd_file(self, cmd_file_name, out_file_name=""):
@@ -422,7 +423,7 @@ class EnmCli(object):
         except KeyboardInterrupt:
             print("\nInterrupted with Ctrl^C.")
         except Exception as exc:
-            print("Error in execute_cmd_file", exc)
+            print("Error in execute_cmd_file: " + str(exc))
 
     def _completion_display_matches(self, substitution, matches_list, longest_match_length):
         pass
@@ -491,7 +492,7 @@ class EnmCli(object):
                     new_list.append(x.replace('\n', '').replace('\r', ''))
             return new_list
         except Exception as exc:
-            print(exc)
+            print("error in _extend_cli_completer_list: " + str(exc))
             return [None]
 
     @staticmethod
@@ -551,7 +552,7 @@ class EnmCli(object):
                 mo_list.sort()
             return mo_list
         except Exception as exc:
-            print("topology_browser_get_child", exc)
+            print("topology_browser_get_child: " + str(exc))
             return None
 
     @staticmethod
@@ -567,7 +568,7 @@ class EnmCli(object):
             else:
                 return j_loads(resp.content)
         except Exception as exc:
-            print("persistent_object_get_data error", exc)
+            print("persistent_object_get_data error: " + str(exc))
             return None
 
     def ping_ne(self, cmd):
@@ -583,7 +584,7 @@ class EnmCli(object):
             try:
                 response = self.enm_session.terminal().execute('cmedit get ' + ne + ' NetworkElement')
             except Exception as exc:
-                print("enm session error! May be session is expired?\n", exc)
+                print("enm session error! May be session is expired?\n " + str(exc))
                 return False
             ne_list = []
             for s in response.get_output():
@@ -603,7 +604,7 @@ class EnmCli(object):
                         process = Popen('ping ' + ip_address + " " + " ".join(ping_args), stderr=PIPE, shell=True)
                         result = result + str(node_id) + " : " + str(process.communicate('')[0]) + "\n"
                     except Exception as exc:
-                        print(exc)
+                        print("Error during ping : " + str(exc))
         except KeyboardInterrupt:
             print("ping stopped by user")
         return result
