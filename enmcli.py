@@ -241,7 +241,7 @@ class EnmCli(object):
             try:
                 cmd = raw_input(self.cli_input_string)
             except KeyboardInterrupt:
-                print "\nExit CLI with Ctrl^C. Bye!"
+                print("\nExit CLI with Ctrl^C. Bye!")
                 break
         return enmscripting.close(self.enm_session)
 
